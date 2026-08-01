@@ -1,0 +1,31 @@
+{
+  "name": "tshirt-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Custom t-shirt design and order management platform",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev -w @tshirt/api",
+    "dev:web": "npm run dev -w @tshirt/web",
+    "build": "npm run build -w @tshirt/api && npm run build -w @tshirt/web",
+    "test": "npm run test -w @tshirt/api && npm run test -w @tshirt/web",
+    "lint": "npm run lint -w @tshirt/api && npm run lint -w @tshirt/web",
+    "db:migrate": "npm run db:migrate -w @tshirt/api",
+    "db:studio": "npm run db:studio -w @tshirt/api",
+    "db:seed": "npm run db:seed -w @tshirt/api",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:reset": "docker compose -f docker/docker-compose.yml down -v"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3"
+  }
+}

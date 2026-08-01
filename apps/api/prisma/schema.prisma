@@ -1,0 +1,36 @@
+// Phase 01 — কঙ্কাল schema. Auth Phase 02-এ, কিন্তু migration pipeline আজই কাজ করা দরকার।
+// পরের phase-গুলোতে Product, Design, Order ইত্যাদি model যোগ হবে।
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// connection URL prisma.config.ts-এ — Prisma 7-এ schema-তে `url` আর সাপোর্টেড নয়
+datasource db {
+  provider = "postgresql"
+}
+
+/// RBAC role — packages/shared/src/constants/roles.ts-এর সাথে হুবহু মিল থাকতে হবে
+enum Role {
+  SUPER_ADMIN
+  ORDER_MANAGER
+  DESIGNER
+  ACCOUNTANT
+  CUSTOMER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?  @unique
+  name      String
+  /// argon2 hash — কখনো plain text নয় (Phase 02)
+  password  String
+  role      Role     @default(CUSTOMER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@map("users")
+}
