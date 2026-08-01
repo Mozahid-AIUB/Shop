@@ -18,8 +18,10 @@
 | 12 | Hardening + Deploy | ⬜ বাকি | — |
 
 **এখন কোথায়:** Phase 01 শেষ ও যাচাই হয়েছে — lint পরিষ্কার, টেস্ট ৫/৫ (api 2, web 3), দুই app build হয়, লাইভ `/health` DB-up-এ 200 ও DB-down-এ 503 দেয়।
-**পরের কাজ:** `02-auth-rbac.md` লিখে তারপর execute।
+**পরের কাজ:** `02-auth-rbac.md` sub-plan লিখে তারপর execute — register/login, JWT access+refresh, ৫টা role, Nest guard + Next middleware, প্রথম admin অ্যাকাউন্ট seed।
 **Blocker:** নেই।
+
+**Push করার আগে `/ship-review` চালাও** — `.claude/skills/ship-review/`। lint+test+build চালায়, diff-এ secret খোঁজে, এই স্ট্যাকের security ও production-readiness checklist ধরে রিভিউ করে, Blocker/High ফিক্স করে, তারপর commit+push।
 
 ## এই মেশিনের environment নোট (হোঁচট খাওয়ার আগে পড়ো)
 
