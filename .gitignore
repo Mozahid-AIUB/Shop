@@ -1,0 +1,51 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# local tooling
+.claude/
+
+# env — .env.example ছাড়া কিছু কমিট হবে না
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# test / coverage
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
+# docker volumes
+docker/data/
+docker/minio-data/
+
+# logs
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# editor / os
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# misc
+.turbo/
+.cache/
+*.pem

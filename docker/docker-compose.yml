@@ -1,0 +1,76 @@
+name: tshirt-platform
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: tshirt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tshirt
+      POSTGRES_PASSWORD: tshirt
+      POSTGRES_DB: tshirt_db
+    ports:
+      # host-এ আগে থেকে PostgreSQL 16 চলছে (postgresql-x64-16 service) যেটা 5432 দখল করে আছে,
+      # তাই এই প্রজেক্ট 5433 ব্যবহার করে। container-এর ভেতরে port 5432-ই।
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tshirt -d tshirt_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    container_name: tshirt-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: tshirt-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console — http://localhost:9001
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # one-shot: bucket তৈরি করে দেয় যাতে হাতে বানাতে না হয়
+  minio-init:
+    image: minio/mc:latest
+    container_name: tshirt-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing local/tshirt-designs &&
+      mc anonymous set download local/tshirt-designs &&
+      echo 'bucket tshirt-designs ready'
+      "
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
