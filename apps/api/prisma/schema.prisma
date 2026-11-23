@@ -31,6 +31,32 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshTokens RefreshToken[]
+
   @@index([role])
   @@map("users")
+}
+
+/// লগইন সেশন. কাঁচা টোকেন কখনো এখানে থাকবে না — শুধু sha256 hash,
+/// যাতে DB লিক হলেও কারো সেশন হাইজ্যাক করা না যায়।
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  /// একটা লগইন থেকে জন্মানো সব টোকেনের একই familyId। rotate হলে নতুন row পায়
+  /// কিন্তু family একই থাকে — মুছে ফেলা টোকেন আবার এলে এই family ধরেই চুরি ধরা পড়ে।
+  familyId  String
+  /// rotate হয়ে যাওয়া টোকেন সঙ্গে সঙ্গে মুছি না — ফিরে এলে যেন চিনতে পারি
+  revokedAt DateTime?
+  /// audit — কোন device/IP থেকে সেশনটা শুরু হয়েছিল
+  userAgent String?
+  ip        String?
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
 }
