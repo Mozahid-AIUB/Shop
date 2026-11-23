@@ -29,6 +29,14 @@
 **Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
 Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছে ব্যবস্থা করতে হবে।
 
+## খোলা finding (ship-review থেকে, push আটকায় না)
+
+- **Medium — `GET /orders` unbounded** (`apps/api/src/modules/orders/orders.service.ts:207`):
+  কাস্টমারের সব অর্ডার একবারে আসে, pagination নেই। নিয়মিত ক্রেতার কয়েকশো অর্ডার
+  হলে response ভারী হবে। Admin board-এ cursor/page আছে, এটায় নেই।
+  **কখন ঠিক করব:** Phase 04-এর storefront UI লেখার সময় — তখনই জানা যাবে
+  UI কত করে চায়, আর cursor না page সেটাও তখন ঠিক করা সহজ।
+
 **Push করার আগে `/ship-review` চালাও** — `.claude/skills/ship-review/`। lint+test+build চালায়, diff-এ secret খোঁজে, এই স্ট্যাকের security ও production-readiness checklist ধরে রিভিউ করে, Blocker/High ফিক্স করে, তারপর commit+push।
 
 ## এই মেশিনের environment নোট (হোঁচট খাওয়ার আগে পড়ো)
