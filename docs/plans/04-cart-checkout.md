@@ -51,16 +51,16 @@
 
 ## Task Checklist
 
-- [ ] 4.1 Schema + migration
-- [ ] 4.2 **টেস্ট:** Order ID — concurrent, দিনে রিসেট, ডুপ্লিকেট নেই
-- [ ] 4.3 `OrderNumberService` — FOR UPDATE transaction
-- [ ] 4.4 **টেস্ট:** দাম সার্ভারে হিসাব, ক্লায়েন্টের দাম উপেক্ষিত
-- [ ] 4.5 **টেস্ট:** স্টকের বেশি অর্ডার আটকায়, concurrent-এ oversell নেই
-- [ ] 4.6 `CartService` + controller
-- [ ] 4.7 `AddressService` + controller
-- [ ] 4.8 `OrdersService` — চেকআউট transaction
-- [ ] 4.9 **টেস্ট:** একজন অন্যের অর্ডার দেখতে পায় না
-- [ ] Verification → PROGRESS ✅ → commit
+- [x] 4.1 Schema + migration
+- [x] 4.2 **টেস্ট:** Order ID — concurrent, দিনে রিসেট, ডুপ্লিকেট নেই
+- [x] 4.3 `OrderNumberService` — FOR UPDATE transaction
+- [x] 4.4 **টেস্ট:** দাম সার্ভারে হিসাব, ক্লায়েন্টের দাম উপেক্ষিত
+- [x] 4.5 **টেস্ট:** স্টকের বেশি অর্ডার আটকায়, concurrent-এ oversell নেই
+- [x] 4.6 `CartService` + controller
+- [x] 4.7 `AddressService` + controller
+- [x] 4.8 `OrdersService` — চেকআউট transaction
+- [x] 4.9 **টেস্ট:** একজন অন্যের অর্ডার দেখতে পায় না
+- [x] Verification → PROGRESS ✅ → commit (API অংশ; UI বাকি)
 
 ---
 

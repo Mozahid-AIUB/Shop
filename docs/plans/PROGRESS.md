@@ -18,11 +18,12 @@
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening + Deploy | ⬜ বাকি | — |
 
-**এখন কোথায়:** Phase 02-03 `main`-এ merge হয়েছে। Phase 04 চলছে `phase/04-cart-checkout`
-branch-এ — schema + migration + `OrderNumberService` + order number helper ও তার টেস্ট হয়ে গেছে
-(৫১টা API টেস্ট + ৩টা web টেস্ট সবুজ)।
-**পরের কাজ:** 4.4 — চেকআউটের টেস্ট আগে: দাম সার্ভারে হিসাব হয়, স্টক কমে, oversell আটকায়।
-তারপর `CartService` → `AddressService` → `OrdersService`।
+**এখন কোথায়:** Phase 02-03 `main`-এ merge। Phase 04-এর **API শেষ** (branch
+`phase/04-cart-checkout`) — কার্ট, ঠিকানা, চেকআউট, অর্ডার তালিকা ও বিস্তারিত।
+দাম সার্ভারে DB থেকে, স্টক conditional update-এ কমে (oversell হয় না),
+অর্ডার নম্বর concurrent-safe, একজন অন্যের কার্ট/অর্ডার ছুঁতে পারে না।
+**৭০টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
+**পরের কাজ:** Phase 04-এর UI — পণ্যের তালিকা, কার্ট, চেকআউট পাতা (`(shop)` route group)।
 **Blocker:** নেই।
 
 **Push করার আগে `/ship-review` চালাও** — `.claude/skills/ship-review/`। lint+test+build চালায়, diff-এ secret খোঁজে, এই স্ট্যাকের security ও production-readiness checklist ধরে রিভিউ করে, Blocker/High ফিক্স করে, তারপর commit+push।
@@ -41,3 +42,10 @@ branch-এ — schema + migration + `OrderNumberService` + order number helper �
   আর `npm run build -w @shop/shared` চালাও — api/web `dist` পড়ে, `src` নয়
 - argon2 native build লাগে না — `prebuilds/win32-x64` আছে, npm-এর
   "install scripts not covered by allowScripts" warning এখানে ক্ষতিকর নয়
+- **টেস্ট সবসময় `npm run test -w @shop/api` দিয়ে চালাও**, repo root থেকে
+  `npx jest --rootDir apps/api` দিয়ে নয়। `app.module.ts`-এ `envFilePath: ['../../.env']`
+  আপেক্ষিক — ভুল cwd থেকে চালালে `.env` পড়া হয় না, `DATABASE_URL` খালি থাকে,
+  Prisma ডিফল্ট 5432-এ গিয়ে `ECONNREFUSED` দেয় আর **সব টেস্ট fail করে**।
+  এটা DB বন্ধ থাকার মতো দেখায়, কিন্তু আসলে cwd-র সমস্যা
+- টেস্টে `logger: false` থাকায় 500-এর আসল কারণ লুকিয়ে থাকে। ডিবাগ করতে
+  সাময়িকভাবে সরাও, কাজ শেষে ফিরিয়ে দাও
