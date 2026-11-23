@@ -28,6 +28,10 @@ jobs:
       DATABASE_URL: postgresql://tshirt:tshirt@127.0.0.1:5433/tshirt_db?schema=public
       NEXT_PUBLIC_API_URL: http://127.0.0.1:4000
       WEB_ORIGIN: http://127.0.0.1:3000
+      # TokenService ডিফল্ট secret রাখে না — না পেলে throw করে, আর তখন
+      # login 500 দেয় আর DB ব্যবহার করা প্রতিটা suite ভেঙে পড়ে।
+      # এটা throwaway CI মান; আসল secret কখনো এখানে লেখা হবে না।
+      JWT_ACCESS_SECRET: ci-only-access-secret-not-used-anywhere-else
 
     steps:
       - uses: actions/checkout@v5

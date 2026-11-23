@@ -60,6 +60,10 @@ Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছ�
   এটা DB বন্ধ থাকার মতো দেখায়, কিন্তু আসলে cwd-র সমস্যা
 - টেস্টে `logger: false` থাকায় 500-এর আসল কারণ লুকিয়ে থাকে। ডিবাগ করতে
   সাময়িকভাবে সরাও, কাজ শেষে ফিরিয়ে দাও
+- **লোকালে পাস করা মানে CI-তে পাস নয়** — `packages/shared/dist` কমিট হয় না,
+  আর লোকালে আগের build পড়ে থাকে বলে ভাঙা জিনিসও পাস করে। সন্দেহ হলে
+  `rm -rf packages/shared/dist` করে তারপর lint+test+build চালাও — CI ঠিক
+  এই অবস্থা থেকেই শুরু করে
 - **schema-তে নতুন model যোগ করলে `npx prisma generate` চালাও** (apps/api থেকে),
   নইলে `tx.payment does not exist` ধরনের TS error আসে — migration চললেও
   client-এ নতুন টাইপ আসে না
