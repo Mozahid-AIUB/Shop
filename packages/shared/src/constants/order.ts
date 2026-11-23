@@ -28,9 +28,27 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[
 export const PAYMENT_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'REFUNDED'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
-export const PRINT_METHODS = ['SCREEN_PRINT', 'DTG', 'VINYL', 'SUBLIMATION'] as const;
-export type PrintMethod = (typeof PRINT_METHODS)[number];
+/**
+ * কুরিয়ার — Phase 12-এ adapter লেখা হবে।
+ * `MANUAL` মানে নিজের লোক দিয়ে ডেলিভারি, কোনো API নেই।
+ */
+export const COURIERS = ['STEADFAST', 'PATHAO', 'REDX', 'MANUAL'] as const;
+export type Courier = (typeof COURIERS)[number];
 
-/** ডিজাইন শার্টের কোথায় বসবে। */
-export const PRINT_PLACEMENTS = ['FRONT', 'BACK', 'LEFT_CHEST', 'RIGHT_CHEST', 'SLEEVE', 'FULL'] as const;
-export type PrintPlacement = (typeof PRINT_PLACEMENTS)[number];
+/** শিপমেন্টের অবস্থা — কুরিয়ার webhook এগুলোতে map হবে। */
+export const SHIPMENT_STATUSES = [
+  'PENDING',
+  'PICKED_UP',
+  'IN_TRANSIT',
+  'DELIVERED',
+  'RETURNED',
+  'CANCELLED',
+] as const;
+export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
+
+/**
+ * COD ঢ়ুঁকির স্তর — Phase 13।
+ * বাংলাদেশে COD-এ ভুয়া অর্ডারে কুরিয়ার খরচ জলে যায়, তাই এটা দরকারি।
+ */
+export const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH', 'BLOCKED'] as const;
+export type RiskLevel = (typeof RISK_LEVELS)[number];

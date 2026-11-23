@@ -1,4 +1,4 @@
-import type { HealthResponse } from '@tshirt/shared';
+import type { HealthResponse } from '@shop/shared';
 
 type Tone = 'ok' | 'warn' | 'down';
 

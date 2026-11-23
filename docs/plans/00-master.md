@@ -115,26 +115,27 @@ ProductionTask ── Order     Coupon             Notification
 
 ---
 
-## Roadmap — ১২টা Phase
+## Roadmap — ১৩টা Phase
 
 প্রতিটা phase = একটা sub-plan ফাইল = আদর্শভাবে ১-২টা session।
 
 | # | Sub-plan | কী দাঁড়াবে (Done মানে কী) |
 |---|---|---|
-| 01 | `01-foundation.md` | Docker compose উঠলে Postgres+Redis+MinIO চলে, `/health` 200 দেয়, Next হোমপেজ ওঠে, CI সবুজ |
-| 02 | `02-auth-rbac.md` | রেজিস্টার/লগইন/রিফ্রেশ কাজ করে, ৪টা role (Super Admin/Order Manager/Designer/Accountant), `(admin)` route রক্ষিত |
-| 03 | `03-catalog.md` | অ্যাডমিন প্রোডাক্ট+ভ্যারিয়েন্ট+স্টক CRUD করে, storefront-এ ক্যাটালগ ও PDP দেখা যায় |
-| 04 | `04-design-studio.md` | **মূল ফিচার** — Fabric ক্যানভাসে টেক্সট/ফন্ট/কালার, লোগো আপলোড, clipart, front/back placement, ডিজাইন সেভ+লোড |
-| 05 | `05-3d-preview.md` | ক্যানভাস→texture, Three.js শার্ট মডেল ঘুরিয়ে দেখা যায় |
-| 06 | `06-cart-checkout.md` | কার্ট → ঠিকানা → অর্ডার তৈরি, **Unique Order ID জেনারেট**, কনফার্মেশন পেজ |
-| 07 | apyment system pore korbo skip korte paro miniman kaaj bade +  `07-payments.md` | bKash/SSLCommerz sandbox-এ পেমেন্ট সফল, COD, আংশিক পেমেন্ট, PDF ইনভয়েস |
-| 08 | `08-order-lifecycle.md` | Status state machine (Pending→…→Delivered), পাবলিক "Track My Order", অ্যাডমিন অর্ডার বোর্ড, সার্চ/ফিল্টার |
-| 09 | `09-admin-production.md` | ডিজাইনার প্যানেল, print-ready ফাইল আপলোড+অ্যাপ্রুভাল, প্রোডাকশন টাস্ক লিস্ট |
-| 10 | `10-notifications.md` | BullMQ queue, SMS+Email adapter, অর্ডার কনফার্ম/স্ট্যাটাস/পেমেন্ট রিমাইন্ডার ট্রিগার |
-| 11 | `11-reports.md` | সেলস চার্ট, best-seller, status pie, revenue vs due, repeat customer |
-| 12 | `12-hardening-deploy.md` | Rate limit, validation, structured log, DB backup cron, প্রোডাকশন deploy |
+| 01 | `01-foundation.md` | Postgres চলে, `/health` 200 দেয়, Next হোমপেজ ওঠে, CI সবুজ |
+| 02 | `02-auth-rbac.md` | রেজিস্টার/লগইন/রিফ্রেশ কাজ করে, ৫টা role, refresh rotation + reuse detection, `(admin)` route রক্ষিত |
+| 03 | `03-catalog.md` | যেকোনো পণ্য — নমনীয় variant + attribute, ক্যাটাগরি গাছ, স্টক, storefront ক্যাটালগ ও PDP |
+| 04 | `04-cart-checkout.md` | কার্ট → ঠিকানা → অর্ডার তৈরি, **Unique Order ID জেনারেট**, কনফার্মেশন পেজ |
+| 05 | `05-payments.md` | **ছোট রাখা হচ্ছে** — COD + manual/offline payment রেকর্ড + PDF ইনভয়েস। bKash/SSLCommerz gateway আপাতত `mock` adapter-এর পিছনে, আসল integration পরে |
+| 06 | `06-order-lifecycle.md` | Status state machine (Pending→…→Delivered), পাবলিক "Track My Order", অ্যাডমিন অর্ডার বোর্ড, সার্চ/ফিল্টার |
+| 07 | `07-admin.md` | অর্ডার/প্রোডাক্ট/কাস্টমার/স্টক ব্যবস্থাপনা, রোলভিত্তিক অ্যাক্সেস, activity log |
+| 08 | `08-notifications.md` | BullMQ queue, SMS+Email adapter, অর্ডার কনফার্ম/স্ট্যাটাস/পেমেন্ট রিমাইন্ডার ট্রিগার |
+| 09 | `09-reports.md` | সেলস চার্ট, best-seller, status pie, revenue vs due, repeat customer |
+| 10 | `10-courier.md` | Steadfast/Pathao/RedX adapter, অর্ডার থেকে এক ক্লিকে consignment, webhook দিয়ে delivery status sync |
+| 11 | `11-fraud-guard.md` | COD ঝুঁকি স্কোরিং — কুরিয়ার return history, একই ফোন/IP-তে বারবার অর্ডার, auto-block + manual review queue |
+| 12 | `12-tracking-pixel.md` | Meta Pixel + Conversions API (server-side), GA4, event dedup (`event_id`), consent |
+| 13 | `13-hardening-deploy.md` | Rate limit, validation, structured log, DB backup cron, VPS deploy (Docker ছাড়াও চলবে) |
 
-**Phase 4 সবচেয়ে ভারী** — দরকার হলে `04a-canvas-core.md` + `04b-assets-clipart.md`-এ ভাঙা হবে।
+**Phase 03 আর 07 সবচেয়ে ভারী** — catalog-এ সব রকম প্রোডাক্টের variant, admin-এ বহু ফিচার।
 
 ---
 
@@ -153,7 +154,7 @@ ProductionTask ── Order     Coupon             Notification
 - **Git commit-এ Claude/AI-র নাম বা `Co-Authored-By` লাইন থাকবে না** — contributor শুধু আপনি
 - Commit style: Conventional Commits (`feat(orders): ...`)
 - প্রতি phase নিজের branch-এ, শেষে `main`-এ merge
-- সব কিছু Docker-এ চলবে — host-এ আলাদা Postgres install নেই
+- Dev মেশিনে Postgres 17 native (port 5433) — এই মেশিনে Docker নেই। VPS-এও Docker ছাড়া deploy হবে
 - Secret শুধু `.env`-এ, `.env.example` কমিট হবে, `.env` কখনো না
 
 ---
@@ -168,7 +169,7 @@ npm run test -w apps/web          # Vitest
 npm run build                     # দুই app-ই build হয়
 ```
 
-**Phase 12-এর শেষে full end-to-end (Playwright):** রেজিস্টার → শার্ট বেছে নেওয়া → স্টুডিওতে টেক্সট+লোগো বসানো → 3D-তে দেখা → কার্টে যোগ → চেকআউট → sandbox পেমেন্ট → Order ID পাওয়া → ট্র্যাকিং পেজে স্ট্যাটাস দেখা → অ্যাডমিন লগইন করে স্ট্যাটাস বদলানো → কাস্টমার নোটিফিকেশন পাওয়া।
+**Phase 13-এর শেষে full end-to-end (Playwright):** রেজিস্টার → প্রোডাক্ট বেছে নেওয়া → variant বাছাই → কার্টে যোগ → চেকআউট → sandbox পেমেন্ট → Order ID পাওয়া → ট্র্যাকিং পেজে স্ট্যাটাস দেখা → অ্যাডমিন লগইন করে স্ট্যাটাস বদলানো → কাস্টমার নোটিফিকেশন পাওয়া।
 
 এই পুরো flow একবারে পাস করলে প্ল্যাট‌ফর্ম লাইভে যাওয়ার জন্য প্রস্তুত।
 

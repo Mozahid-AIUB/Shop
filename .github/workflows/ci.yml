@@ -40,10 +40,10 @@ jobs:
       - run: npm ci
 
       - name: Apply migrations
-        run: npm run db:deploy -w @tshirt/api
+        run: npm run db:deploy -w @shop/api
 
       - name: Generate Prisma client
-        run: npm run db:generate -w @tshirt/api
+        run: npm run db:generate -w @shop/api
 
       - run: npm run lint
 
