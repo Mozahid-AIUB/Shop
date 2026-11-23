@@ -25,6 +25,33 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, readonly OrderStatus[
   CANCELLED: [],
 };
 
+/**
+ * এক status থেকে আরেকটায় যাওয়া যায় কিনা।
+ *
+ * API guard আর UI-র বাটন — দুই জায়গায় **এই একটাই** নিয়ম চলে,
+ * তাই অ্যাডমিন যে বাটন দেখে সেটা চাপলে সার্ভার না বলবে না।
+ */
+export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
+  return ORDER_STATUS_TRANSITIONS[from].includes(to);
+}
+
+/** এখন থেকে যেখানে যাওয়া যায় — UI-তে বাটন বানাতে। */
+export function nextStatuses(from: OrderStatus): readonly OrderStatus[] {
+  return ORDER_STATUS_TRANSITIONS[from];
+}
+
+/** আর কোথাও যাওয়ার নেই — অর্ডার শেষ। */
+export const isTerminalStatus = (status: OrderStatus): boolean =>
+  ORDER_STATUS_TRANSITIONS[status].length === 0;
+
+/**
+ * বাতিল করা যাবে কিনা। ছাপা হয়ে গেলে (`PRINTED`) আর নয় —
+ * কাপড় ও কাজ দুটোই খরচ হয়ে গেছে, তখন বাতিল মানে লোকসান।
+ * টাকা ফেরতের সিদ্ধান্ত আলাদা, সেটা পেমেন্টের দিকে।
+ */
+export const isCancellable = (status: OrderStatus): boolean =>
+  ORDER_STATUS_TRANSITIONS[status].includes('CANCELLED');
+
 export const PAYMENT_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'REFUNDED'] as const;
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 

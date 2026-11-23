@@ -37,6 +37,8 @@ model User {
   orders        Order[]
   /// এই staff যে পেমেন্টগুলো লিখেছে
   recordedPayments Payment[]
+  /// এই staff যে status বদলগুলো করেছে
+  statusChanges OrderStatusHistory[]
 
   @@index([role])
   @@map("users")
@@ -330,6 +332,8 @@ model OrderStatusHistory {
   createdAt DateTime    @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// staff মুছে গেলেও ইতিহাস থাকবে — তাই SetNull, Cascade নয়
+  changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
 
   @@index([orderId, createdAt])
   @@map("order_status_history")

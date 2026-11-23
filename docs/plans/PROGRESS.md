@@ -9,7 +9,7 @@
 | 03 | Catalog + Inventory | ✅ শেষ (backend) | `03-catalog.md` |
 | 04 | Cart + Checkout + Order ID | ✅ শেষ (backend) | `04-cart-checkout.md` |
 | 05 | Payments (COD + manual, gateway পরে) | ✅ শেষ (backend) | `05-payments.md` |
-| 06 | Order Lifecycle + Tracking | ⬜ বাকি | — |
+| 06 | Order Lifecycle + Tracking | ✅ শেষ (backend) | `06-order-lifecycle.md` |
 | 07 | Admin Panel | ⬜ বাকি | — |
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
 | 09 | Reports + Analytics | ⬜ বাকি | — |
@@ -18,13 +18,14 @@
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening + Deploy | ⬜ বাকি | — |
 
-**এখন কোথায়:** Phase 02-04 `main`-এ merge। Phase 05-এর **API শেষ**
-(branch `phase/05-payments`) — COD ও হাতে লেখা পেমেন্ট, আংশিক পেমেন্ট,
-due হিসাব payment row-এর যোগফল থেকে (`Order`-এ জমানো নয়), ভুল এন্ট্রি
-void (মোছা নয়), `PaymentProvider` interface গেটওয়ের জায়গা রেখে।
-**৯৬টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
-**পরের কাজ:** Phase 06 — Order lifecycle state machine + public order tracking।
-সিদ্ধান্ত: আগে পুরো backend (06, 07, 09, 11, 13), UI তারপর।
+**এখন কোথায়:** Phase 02-05 `main`-এ merge। Phase 06-এর **API শেষ**
+(branch `phase/06-order-lifecycle`) — status state machine (অবৈধ transition 409,
+পেছনে যাওয়া বন্ধ), বাতিলে স্টক ফেরত, role-ভিত্তিক transition (DESIGNER শুধু
+নিজের ধাপ), অ্যাডমিন অর্ডার বোর্ড (search/filter/pagination), আর
+**public `/track`** — Order ID + ফোন দুটোই লাগে, টাকার হিসাব ফাঁস হয় না।
+**১৩০টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
+**পরের কাজ:** Phase 07 — Admin panel (production task, activity log, PDF invoice)।
+সিদ্ধান্ত: আগে পুরো backend (07, 09, 11, 13), UI তারপর।
 **Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
 Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছে ব্যবস্থা করতে হবে।
 

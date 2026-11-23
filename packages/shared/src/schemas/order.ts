@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { phoneSchema } from './auth';
+import { ORDER_STATUSES, PAYMENT_STATUSES } from '../constants/order';
+import { ORDER_NUMBER_REGEX } from '../constants/order-number';
 
 /**
  * Cart, address আর checkout-এর validation — API-তে input যাচাই,
@@ -74,6 +76,55 @@ export const checkoutInputSchema = checkoutSchema.refine(
   (value) => (value.addressId === undefined) !== (value.address === undefined),
   { message: 'ঠিকানা বাছুন বা নতুন ঠিকানা দিন — একটা', path: ['addressId'] },
 );
+
+// ---------- Status change (staff) ----------
+
+export const changeOrderStatusSchema = z.object({
+  toStatus: z.enum(ORDER_STATUSES),
+  /** কেন বদলালো — বাতিলে বিশেষভাবে দরকারি */
+  note: z.string().trim().max(300).nullable().optional(),
+});
+
+export const cancelOrderSchema = z.object({
+  reason: z.string().trim().min(3, 'বাতিলের কারণ লিখুন').max(300),
+});
+
+// ---------- Public tracking ----------
+
+/**
+ * লগইন ছাড়া অর্ডার খোঁজা — **দুটোই** মিলতে হবে।
+ *
+ * শুধু Order ID দিলে যে কেউ `001` থেকে গুনে সব অর্ডার দেখে ফেলত:
+ * কে কী কিনেছে, কোথায় থাকে। ফোন মেলানো মানে অর্ডারটা যার সে-ই দেখছে।
+ */
+export const trackOrderSchema = z.object({
+  orderNumber: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(ORDER_NUMBER_REGEX, 'অর্ডার নম্বর এভাবে হবে: ORD-2026-1123-018'),
+  phone: phoneSchema,
+});
+
+// ---------- Admin order board ----------
+
+export const orderListQuerySchema = z.object({
+  /** orderNumber, ফোন বা নামের অংশ */
+  search: z.string().trim().max(80).optional(),
+  status: z.enum(ORDER_STATUSES).optional(),
+  paymentStatus: z.enum(PAYMENT_STATUSES).optional(),
+  /** ISO তারিখ — এই দিন থেকে (সার্ভারের লোকাল দিন ধরে) */
+  from: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'তারিখ YYYY-MM-DD').optional(),
+  to: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, 'তারিখ YYYY-MM-DD').optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  /** উপরে সীমা — নইলে `perPage=100000` দিয়ে পুরো DB টেনে নেওয়া যেত */
+  perPage: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+export type ChangeOrderStatusInput = z.infer<typeof changeOrderStatusSchema>;
+export type CancelOrderInput = z.infer<typeof cancelOrderSchema>;
+export type TrackOrderInput = z.infer<typeof trackOrderSchema>;
+export type OrderListQuery = z.infer<typeof orderListQuerySchema>;
 
 export type AddCartItemInput = z.infer<typeof addCartItemSchema>;
 export type UpdateCartItemInput = z.infer<typeof updateCartItemSchema>;
