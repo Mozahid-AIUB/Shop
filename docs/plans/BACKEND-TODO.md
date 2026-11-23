@@ -43,9 +43,10 @@
 
 ## Phase 04 — Cart + Checkout + Order ID
 
-- [ ] 4.1 Schema: `Order`, `OrderItem`, `Address`, `OrderStatusHistory`, `order_counter`
-- [ ] 4.2 **টেস্ট:** Order ID — **concurrent insert**, দিনে রিসেট, কোনো ডুপ্লিকেট নেই
-- [ ] 4.3 `OrderIdService` — `SELECT ... FOR UPDATE` transaction-এ
+- [x] 4.1 Schema: `Order`, `OrderItem`, `Address`, `OrderStatusHistory`, `order_counter`
+- [x] 4.2a **টেস্ট:** order number ফরম্যাট — padding, ৯৯৯ ছাড়ানো, parse, দিনে রিসেট
+- [ ] 4.2b **টেস্ট:** Order ID — **concurrent insert**, কোনো ডুপ্লিকেট নেই (DB লাগে, চেকআউটের সাথে)
+- [x] 4.3 `OrderNumberService` — কাউন্টার row-এ `ON CONFLICT … RETURNING`, transaction-এর ভেতরে
 - [ ] 4.4 **টেস্ট:** অর্ডার তৈরি — স্টক কমে, দাম সার্ভারে হিসাব হয় (client-এর পাঠানো দাম বিশ্বাস নয়)
 - [ ] 4.5 Cart + checkout API
 

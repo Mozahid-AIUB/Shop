@@ -32,6 +32,9 @@ model User {
   updatedAt DateTime @updatedAt
 
   refreshTokens RefreshToken[]
+  cart          Cart?
+  addresses     Address[]
+  orders        Order[]
 
   @@index([role])
   @@map("users")
@@ -115,8 +118,10 @@ model ProductVariant {
   stock     Int     @default(0)
   isActive  Boolean @default(true)
 
-  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-  options VariantOption[]
+  product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options    VariantOption[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
 
   @@index([productId, isActive])
   @@map("product_variants")
@@ -161,4 +166,161 @@ model ProductImage {
 
   @@index([productId, sortOrder])
   @@map("product_images")
+}
+
+/// অর্ডারের জীবনচক্র — `packages/shared/src/constants/order.ts`-এর সাথে হুবহু মিল।
+enum OrderStatus {
+  PENDING
+  DESIGN_CONFIRMED
+  IN_PRODUCTION
+  PRINTED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+/// ইউজারপ্রতি একটাই কার্ট — লগইন করে অন্য ডিভাইসে গেলেও থাকে।
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  updatedAt DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+/// দাম এখানে রাখা হয় না — চেকআউটের সময় DB থেকে তাজা দাম পড়া হয়,
+/// নইলে কার্টে পুরোনো দাম আটকে থাকত।
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  variantId String
+  quantity  Int
+
+  cart    Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// একই variant দুবার থাকবে না — পরিমাণ বাড়বে
+  @@unique([cartId, variantId])
+  @@map("cart_items")
+}
+
+model Address {
+  id        String  @id @default(cuid())
+  userId    String
+  label     String?
+  fullName  String
+  phone     String
+  line1     String
+  line2     String?
+  city      String
+  district  String
+  postcode  String?
+  isDefault Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([userId, isDefault])
+  @@map("addresses")
+}
+
+/// অর্ডার। ঠিকানা আর দাম এখানে **কপি** করা থাকে —
+/// ইউজার পরে ঠিকানা বদলালে বা পণ্যের দাম বদলালেও পুরোনো অর্ডার অবিকৃত থাকে।
+model Order {
+  id          String      @id @default(cuid())
+  /// ORD-2026-1123-018 — পড়া ও ফোনে বলা সহজ
+  orderNumber String      @unique
+  userId      String
+  status      OrderStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+
+  /// সব টাকা integer paisa-তে
+  subtotalPaisa Int
+  shippingPaisa Int @default(0)
+  discountPaisa Int @default(0)
+  totalPaisa    Int
+
+  /// ডেলিভারির ঠিকানার স্ন্যাপশট
+  addressId        String?
+  shipFullName     String
+  shipPhone        String
+  shipLine1        String
+  shipLine2        String?
+  shipCity         String
+  shipDistrict     String
+  shipPostcode     String?
+
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User                 @relation(fields: [userId], references: [id])
+  address Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items   OrderItem[]
+  history OrderStatusHistory[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+/// অর্ডারের সময়কার পণ্যের তথ্য কপি করা — variant পরে মুছে গেলেও
+/// ইনভয়েসে কী কেনা হয়েছিল তা পড়া যাবে।
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  variantId String?
+
+  productName String
+  variantSku  String
+  /// "Size: L, Color: Black" — অর্ডারের সময় যা ছিল
+  optionsText String?
+
+  unitPricePaisa Int
+  quantity       Int
+  lineTotalPaisa Int
+
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  fromStatus OrderStatus?
+  toStatus  OrderStatus
+  /// কে বদলালো — null মানে সিস্টেম
+  changedById String?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_history")
+}
+
+/// দিনে দিনে অর্ডার নম্বরের সিরিয়াল।
+/// এক দিনে একটাই row; `SELECT … FOR UPDATE` দিয়ে সেটা লক করে বাড়ানো হয়,
+/// তাই একসাথে বহু চেকআউট এলেও দুটো অর্ডার একই নম্বর পায় না।
+model OrderCounter {
+  /// "2026-1123" — তারিখই চাবি
+  dateKey    String @id
+  lastSerial Int    @default(0)
+
+  @@map("order_counters")
 }
