@@ -1,12 +1,14 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  ACTIVITY_ACTIONS,
   summarizePayments,
   type PaymentSummary,
   type RecordPaymentInput,
   type VoidPaymentInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ActivityLogService } from '../admin/activity-log.service';
 
 const PAYMENT_SELECT = {
   id: true,
@@ -31,7 +33,10 @@ export interface PaymentsView extends PaymentSummary {
 
 @Injectable()
 export class PaymentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activity: ActivityLogService,
+  ) {}
 
   /**
    * কাস্টমারের জন্য — `userId` শর্তে, তাই অন্যের অর্ডারের টাকার
@@ -73,9 +78,11 @@ export class PaymentsService {
       );
     }
 
+    let paymentId = '';
+
     try {
       await this.prisma.$transaction(async (tx) => {
-        await tx.payment.create({
+        const created = await tx.payment.create({
           data: {
             orderId: order.id,
             amountPaisa: input.amountPaisa,
@@ -84,7 +91,10 @@ export class PaymentsService {
             note: input.note ?? null,
             recordedById,
           },
+          select: { id: true },
         });
+
+        paymentId = created.id;
 
         await this.syncOrderStatus(tx, order.id, order.totalPaisa);
       });
@@ -100,6 +110,15 @@ export class PaymentsService {
       throw error;
     }
 
+    // transaction-এর বাইরে — rollback হলে লগও থাকা উচিত নয়
+    await this.activity.record({
+      actorId: recordedById,
+      action: ACTIVITY_ACTIONS.PAYMENT_RECORDED,
+      entityType: 'Payment',
+      entityId: paymentId,
+      summary: `${input.method} ${input.amountPaisa / 100} টাকা on ${orderNumber}`,
+    });
+
     return this.view(orderNumber);
   }
 
@@ -108,7 +127,11 @@ export class PaymentsService {
    * যোগফল থেকে বাদ পড়ে, কিন্তু কে কখন কেন বাতিল করলো তা থেকে যায়।
    * টাকার হিসাবে মুছে ফেলা মানে অডিটে প্রশ্নের উত্তর না থাকা।
    */
-  async void(paymentId: string, input: VoidPaymentInput): Promise<PaymentsView> {
+  async void(
+    paymentId: string,
+    input: VoidPaymentInput,
+    voidedById: string,
+  ): Promise<PaymentsView> {
     const payment = await this.prisma.payment.findUnique({
       where: { id: paymentId },
       select: {
@@ -137,6 +160,14 @@ export class PaymentsService {
       });
 
       await this.syncOrderStatus(tx, payment.order.id, payment.order.totalPaisa);
+    });
+
+    await this.activity.record({
+      actorId: voidedById,
+      action: ACTIVITY_ACTIONS.PAYMENT_VOIDED,
+      entityType: 'Payment',
+      entityId: payment.id,
+      summary: `voided: ${input.reason}`,
     });
 
     return this.view(payment.order.orderNumber);

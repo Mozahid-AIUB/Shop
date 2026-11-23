@@ -10,7 +10,7 @@
 | 04 | Cart + Checkout + Order ID | ✅ শেষ (backend) | `04-cart-checkout.md` |
 | 05 | Payments (COD + manual, gateway পরে) | ✅ শেষ (backend) | `05-payments.md` |
 | 06 | Order Lifecycle + Tracking | ✅ শেষ (backend) | `06-order-lifecycle.md` |
-| 07 | Admin Panel | ⬜ বাকি | — |
+| 07 | Admin Panel (production + audit) | ✅ শেষ (backend) | `07-admin-panel.md` |
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
 | 09 | Reports + Analytics | ⬜ বাকি | — |
 | 10 | Courier (Steadfast/Pathao/RedX) | ⬜ বাকি | — |
@@ -18,16 +18,22 @@
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening + Deploy | ⬜ বাকি | — |
 
-**এখন কোথায়:** Phase 02-05 `main`-এ merge। Phase 06-এর **API শেষ**
-(branch `phase/06-order-lifecycle`) — status state machine (অবৈধ transition 409,
-পেছনে যাওয়া বন্ধ), বাতিলে স্টক ফেরত, role-ভিত্তিক transition (DESIGNER শুধু
-নিজের ধাপ), অ্যাডমিন অর্ডার বোর্ড (search/filter/pagination), আর
-**public `/track`** — Order ID + ফোন দুটোই লাগে, টাকার হিসাব ফাঁস হয় না।
-**১৩০টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
-**পরের কাজ:** Phase 07 — Admin panel (production task, activity log, PDF invoice)।
-সিদ্ধান্ত: আগে পুরো backend (07, 09, 11, 13), UI তারপর।
+**এখন কোথায়:** Phase 02-06 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
+Phase 07-এর **API শেষ** (branch `phase/07-admin-panel`) — `ProductionTask`
+(সাধারণ কাজের তালিকা: DESIGN/PRINT/PACKING/QC), assign ও status বদল,
+`ActivityLog` (অ্যাডমিনের লেখার কাজ, শুধু SUPER_ADMIN দেখে, মোছার API নেই),
+আর ইনভয়েসের ডেটা endpoint।
+**১৫৯টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার
+(`dist` মুছে CI-র মতো অবস্থা থেকেও যাচাই করা)।
+**পরের কাজ:** Phase 09 — Reports (Phase 08-এ Redis লাগবে, তাই পরে)।
+সিদ্ধান্ত: আগে পুরো backend, UI তারপর।
 **Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
 Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছে ব্যবস্থা করতে হবে।
+
+**Phase 07-এ প্ল্যান থেকে সরানো:** ফাইল আপলোড (print-ready design) — MinIO
+বসার পর Phase 08-এর সাথে হবে। আপলোড পুরো প্রোডাক্টের সবচেয়ে ঝুঁকিপূর্ণ জায়গা
+(magic byte, SVG XSS, presigned URL), তাই local disk-এ করে পরে S3-এ সরানোর
+বদলে একবারেই আসল storage দিয়ে করা হবে।
 
 ## খোলা finding (ship-review থেকে, push আটকায় না)
 

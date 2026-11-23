@@ -61,9 +61,10 @@ export class AdminPaymentsController {
   @Post('payments/:id/void')
   @HttpCode(HttpStatus.OK)
   voidPayment(
+    @CurrentUser() user: AccessTokenPayload,
     @Param('id') id: string,
     @Body(new ZodValidationPipe(voidPaymentSchema)) body: VoidPaymentInput,
   ): Promise<PaymentsView> {
-    return this.payments.void(id, body);
+    return this.payments.void(id, body, user.sub);
   }
 }
