@@ -39,6 +39,12 @@ model User {
   recordedPayments Payment[]
   /// এই staff যে status বদলগুলো করেছে
   statusChanges OrderStatusHistory[]
+  /// যে কাজগুলো এই staff-কে দেওয়া হয়েছে
+  assignedTasks ProductionTask[]     @relation("AssignedTasks")
+  /// যে কাজগুলো এই staff তৈরি করেছে
+  createdTasks  ProductionTask[]     @relation("CreatedTasks")
+  /// অডিট লগে এই staff-এর কাজ
+  activityLogs  ActivityLog[]
 
   @@index([role])
   @@map("users")
@@ -291,6 +297,7 @@ model Order {
   items    OrderItem[]
   history  OrderStatusHistory[]
   payments Payment[]
+  tasks    ProductionTask[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -375,6 +382,88 @@ model Payment {
   /// একই TrxID দুবার লেখা আটকায় — ভুল করে দুবার এন্ট্রি দিলে ধরা পড়ে
   @@unique([method, reference])
   @@map("payments")
+}
+
+/// কাজের ধরন। ছাপা, প্যাকিং, QC — দোকান যেকোনো পণ্য বিক্রি করে,
+/// তাই ধরনটা সাধারণ রাখা হয়েছে, ছাপার কাজে নির্দিষ্ট নয়।
+enum ProductionTaskKind {
+  DESIGN
+  PRINT
+  PACKING
+  QC
+  OTHER
+}
+
+/// কাজের অবস্থা। স্তর কম রাখা হলো ইচ্ছাকৃতভাবে — বেশি স্তর মানে
+/// কর্মী আপডেট করা বন্ধ করে দেয় আর বোর্ড মিথ্যে বলতে শুরু করে।
+enum ProductionTaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  BLOCKED
+  CANCELLED
+}
+
+/// অর্ডারের একটা কাজ। এক অর্ডারে একাধিক — ছাপা একজন, প্যাকিং আরেকজন।
+model ProductionTask {
+  id      String               @id @default(cuid())
+  orderId String
+  kind    ProductionTaskKind
+  status  ProductionTaskStatus @default(PENDING)
+
+  /// null মানে এখনো কেউ নেয়নি — কাজ তৈরি আর বিলি আলাদা ঘটনা
+  assignedToId String?
+  /// staff মুছে গেলেও কাজ থাকবে, তাই SetNull
+  assignedTo   User?   @relation("AssignedTasks", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById String?
+  createdBy   User?   @relation("CreatedTasks", fields: [createdById], references: [id], onDelete: SetNull)
+
+  note  String?
+  dueAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([assignedToId, status])
+  @@index([status, createdAt])
+  @@map("production_tasks")
+}
+
+/// অ্যাডমিনের **লেখার** কাজের হিসাব — কে কখন কী বদলালো।
+///
+/// পড়ার কাজ ধরা হয় না; ধরলে এই টেবিলই সবচেয়ে বড় হয়ে যেত আর
+/// আসল ঘটনা খুঁজে পাওয়া কঠিন হতো।
+///
+/// `OrderStatusHistory` থেকে আলাদা কারণ সেটা শুধু অর্ডারের status-এর
+/// আর কাস্টমারকেও দেখানো হয়। এটা ভেতরের লোকের জন্য — এক টেবিলে
+/// মেশালে কাস্টমারকে দেখানোর সময় একবার ছাঁকতে ভুললেই তথ্য ফাঁস।
+model ActivityLog {
+  id String @id @default(cuid())
+
+  /// কে করলো — null মানে সিস্টেম (cron, webhook)
+  actorId String?
+  actor   User?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  /// "order.status_changed", "payment.recorded" — ছাঁকার জন্য
+  action String
+
+  /// কোন জিনিসের উপর — "Order", "Payment", "Product"
+  entityType String
+  entityId   String
+
+  /// মানুষের পড়ার মতো এক লাইন — "PENDING → DESIGN_CONFIRMED"
+  summary String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
 
 /// দিনে দিনে অর্ডার নম্বরের সিরিয়াল।

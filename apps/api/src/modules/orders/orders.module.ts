@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from '../admin/admin.module';
 import { AddressService } from './address.service';
 import { CartService } from './cart.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
@@ -12,6 +13,8 @@ import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
 @Module({
+  // ActivityLogService-এর জন্য — status বদল ও বাতিল লগে যায়
+  imports: [AdminModule],
   controllers: [
     OrdersController,
     OrderAdminController,

@@ -76,12 +76,12 @@
 
 ---
 
-## Phase 07 — Admin Panel
+## Phase 07 — Admin Panel ✅ (আপলোড বাদে)
 
-- [ ] 7.1 Schema: `ProductionTask`, `ActivityLog`
-- [ ] 7.2 Designer panel API — print-ready ফাইল আপলোড + approval
-- [ ] 7.3 Production task assign + status
-- [ ] 7.4 Activity log — কে কী বদলালো
+- [x] 7.1 Schema: `ProductionTask`, `ActivityLog`
+- [ ] 7.2 print-ready ফাইল আপলোড — **MinIO বসার পর**, Phase 08-এর সাথে
+- [x] 7.3 Production task assign + status (+ কাজের বোর্ড, filter, pagination)
+- [x] 7.4 Activity log — কে কী বদলালো (+ ইনভয়েস ডেটা endpoint)
 
 ---
 

@@ -1,6 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type OrderStatus } from '@prisma/client';
 import {
+  ACTIVITY_ACTIONS,
   canTransition,
   isCancellable,
   type CancelOrderInput,
@@ -10,6 +11,7 @@ import {
   type TrackOrderInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ActivityLogService } from '../admin/activity-log.service';
 
 const DETAIL_SELECT = {
   id: true,
@@ -107,7 +109,10 @@ const DESIGNER_ALLOWED: readonly { from: OrderStatus; to: OrderStatus }[] = [
 
 @Injectable()
 export class OrderLifecycleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activity: ActivityLogService,
+  ) {}
 
   /**
    * Staff-এর status বদল। নিয়ম `packages/shared`-এর transition map
@@ -143,6 +148,19 @@ export class OrderLifecycleService {
         changedById: actor.id,
         note: input.note ?? null,
       });
+    });
+
+    /**
+     * লগ transaction-এর **বাইরে**: rollback হলে ঘটনাটা ঘটেইনি,
+     * তাই লগও থাকা উচিত নয়। আর ভেতরে রাখলে লগ লেখার ব্যর্থতা
+     * পুরো status বদল ফেলে দিত।
+     */
+    await this.activity.record({
+      actorId: actor.id,
+      action: ACTIVITY_ACTIONS.ORDER_STATUS_CHANGED,
+      entityType: 'Order',
+      entityId: order.id,
+      summary: `${order.status} → ${input.toStatus}`,
     });
 
     return this.findForStaff(orderNumber);
@@ -188,6 +206,14 @@ export class OrderLifecycleService {
         changedById: userId,
         note: input.reason,
       });
+    });
+
+    await this.activity.record({
+      actorId: userId,
+      action: ACTIVITY_ACTIONS.ORDER_CANCELLED,
+      entityType: 'Order',
+      entityId: order.id,
+      summary: `cancelled by customer: ${input.reason}`,
     });
 
     return this.findForStaff(orderNumber);
