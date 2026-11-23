@@ -43,11 +43,16 @@
 
 ## Phase 04 — Cart + Checkout + Order ID
 
-- [ ] 4.1 Schema: `Order`, `OrderItem`, `Address`, `OrderStatusHistory`, `order_counter`
-- [ ] 4.2 **টেস্ট:** Order ID — **concurrent insert**, দিনে রিসেট, কোনো ডুপ্লিকেট নেই
-- [ ] 4.3 `OrderIdService` — `SELECT ... FOR UPDATE` transaction-এ
-- [ ] 4.4 **টেস্ট:** অর্ডার তৈরি — স্টক কমে, দাম সার্ভারে হিসাব হয় (client-এর পাঠানো দাম বিশ্বাস নয়)
-- [ ] 4.5 Cart + checkout API
+- [x] 4.1 Schema: `Order`, `OrderItem`, `Address`, `OrderStatusHistory`, `order_counter`
+- [x] 4.2a **টেস্ট:** order number ফরম্যাট — padding, ৯৯৯ ছাড়ানো, parse, দিনে রিসেট
+- [x] 4.2b **টেস্ট:** Order ID — **concurrent insert**, কোনো ডুপ্লিকেট নেই
+- [x] 4.3 `OrderNumberService` — কাউন্টার row-এ `ON CONFLICT … RETURNING`, transaction-এর ভেতরে
+- [x] 4.4 **টেস্ট:** অর্ডার তৈরি — স্টক কমে, দাম সার্ভারে হিসাব হয় (client-এর পাঠানো দাম বিশ্বাস নয়)
+- [x] 4.5 Cart + checkout API — `CartService`, `AddressService`, `OrdersService`, controller
+- [x] 4.6 **টেস্ট:** একজন অন্যের কার্ট/অর্ডার ছুঁতে পারে না (৪০৪)
+- [x] 4.7 **টেস্ট:** concurrent চেকআউটে oversell নেই — শেষ ১টা পণ্য একজনই পায়
+- [ ] 4.8 Storefront UI — পণ্যের তালিকা, কার্ট, চেকআউট পাতা
+- [ ] 4.9 অ্যাডমিন অর্ডার তালিকা (Phase 07-এ পুরো প্যানেল)
 
 ---
 
