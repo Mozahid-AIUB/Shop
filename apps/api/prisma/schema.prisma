@@ -35,6 +35,8 @@ model User {
   cart          Cart?
   addresses     Address[]
   orders        Order[]
+  /// এই staff যে পেমেন্টগুলো লিখেছে
+  recordedPayments Payment[]
 
   @@index([role])
   @@map("users")
@@ -186,6 +188,24 @@ enum PaymentStatus {
   REFUNDED
 }
 
+/// টাকা কীভাবে এলো। `*_MANUAL` মানে কাস্টমার পাঠিয়েছে আর অ্যাডমিন
+/// হাতে লিখে দিয়েছে — গেটওয়ের নিশ্চয়তা নেই, তাই `reference`-এ TrxID রাখা হয়।
+enum PaymentMethod {
+  COD
+  BKASH_MANUAL
+  NAGAD_MANUAL
+  BANK_TRANSFER
+  CASH
+}
+
+/// পেমেন্ট row-এর অবস্থা। ভুল এন্ট্রি **মুছে ফেলা হয় না** — VOIDED করা হয়,
+/// নইলে টাকার হিসাবের অডিট ট্রেইল হারিয়ে যায়।
+enum PaymentRecordStatus {
+  RECEIVED
+  VOIDED
+  REFUNDED
+}
+
 /// ইউজারপ্রতি একটাই কার্ট — লগইন করে অন্য ডিভাইসে গেলেও থাকে।
 model Cart {
   id        String     @id @default(cuid())
@@ -266,8 +286,9 @@ model Order {
 
   user    User                 @relation(fields: [userId], references: [id])
   address Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  items   OrderItem[]
-  history OrderStatusHistory[]
+  items    OrderItem[]
+  history  OrderStatusHistory[]
+  payments Payment[]
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -312,6 +333,44 @@ model OrderStatusHistory {
 
   @@index([orderId, createdAt])
   @@map("order_status_history")
+}
+
+/// অর্ডারের একটা পেমেন্ট। অর্ডারপ্রতি **একাধিক** হতে পারে —
+/// অগ্রিম ৫০০ + ডেলিভারিতে বাকিটা, এভাবে।
+///
+/// কত টাকা এসেছে তা এই row-গুলোর **যোগফল**, `Order`-এ জমানো কোনো
+/// কলাম নয়। জমিয়ে রাখলে একটা এন্ট্রি ভুল হলে দুই জায়গায় ঠিক করতে হতো,
+/// আর দুটো একসাথে ভুল হলে কোনটা সত্যি তা বোঝার উপায় থাকত না।
+model Payment {
+  id          String              @id @default(cuid())
+  orderId     String
+  /// ঋণাত্মক নয় — রিফান্ড আলাদা row, status দিয়ে চেনা যায়
+  amountPaisa Int
+  method      PaymentMethod
+  status      PaymentRecordStatus @default(RECEIVED)
+
+  /// বিকাশের TrxID, ব্যাংকের slip নম্বর — মেলানোর জন্য
+  reference String?
+  note      String?
+
+  /// কে লিখলো। staff মুছে গেলেও row থাকবে, তাই SetNull
+  recordedById String?
+  recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  /// void করার কারণ — অডিটে "কেন বাতিল" প্রশ্নের উত্তর
+  voidedAt     DateTime?
+  voidReason   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([status])
+  /// একই TrxID দুবার লেখা আটকায় — ভুল করে দুবার এন্ট্রি দিলে ধরা পড়ে
+  @@unique([method, reference])
+  @@map("payments")
 }
 
 /// দিনে দিনে অর্ডার নম্বরের সিরিয়াল।

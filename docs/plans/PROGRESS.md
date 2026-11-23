@@ -7,8 +7,8 @@
 | 01 | Foundation (monorepo, Prisma, health) | ✅ শেষ | `01-foundation.md` |
 | 02 | Auth + RBAC | ✅ শেষ (backend) | `02-auth-rbac.md` |
 | 03 | Catalog + Inventory | ✅ শেষ (backend) | `03-catalog.md` |
-| 04 | Cart + Checkout + Order ID | 🔄 চলছে | `04-cart-checkout.md` |
-| 05 | Payments (COD + manual, gateway পরে) | ⬜ বাকি | — |
+| 04 | Cart + Checkout + Order ID | ✅ শেষ (backend) | `04-cart-checkout.md` |
+| 05 | Payments (COD + manual, gateway পরে) | ✅ শেষ (backend) | `05-payments.md` |
 | 06 | Order Lifecycle + Tracking | ⬜ বাকি | — |
 | 07 | Admin Panel | ⬜ বাকি | — |
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
@@ -18,13 +18,15 @@
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening + Deploy | ⬜ বাকি | — |
 
-**এখন কোথায়:** Phase 02-03 `main`-এ merge। Phase 04-এর **API শেষ** (branch
-`phase/04-cart-checkout`) — কার্ট, ঠিকানা, চেকআউট, অর্ডার তালিকা ও বিস্তারিত।
-দাম সার্ভারে DB থেকে, স্টক conditional update-এ কমে (oversell হয় না),
-অর্ডার নম্বর concurrent-safe, একজন অন্যের কার্ট/অর্ডার ছুঁতে পারে না।
-**৭০টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
-**পরের কাজ:** Phase 04-এর UI — পণ্যের তালিকা, কার্ট, চেকআউট পাতা (`(shop)` route group)।
-**Blocker:** নেই।
+**এখন কোথায়:** Phase 02-04 `main`-এ merge। Phase 05-এর **API শেষ**
+(branch `phase/05-payments`) — COD ও হাতে লেখা পেমেন্ট, আংশিক পেমেন্ট,
+due হিসাব payment row-এর যোগফল থেকে (`Order`-এ জমানো নয়), ভুল এন্ট্রি
+void (মোছা নয়), `PaymentProvider` interface গেটওয়ের জায়গা রেখে।
+**৯৬টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার।
+**পরের কাজ:** Phase 06 — Order lifecycle state machine + public order tracking।
+সিদ্ধান্ত: আগে পুরো backend (06, 07, 09, 11, 13), UI তারপর।
+**Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
+Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছে ব্যবস্থা করতে হবে।
 
 **Push করার আগে `/ship-review` চালাও** — `.claude/skills/ship-review/`। lint+test+build চালায়, diff-এ secret খোঁজে, এই স্ট্যাকের security ও production-readiness checklist ধরে রিভিউ করে, Blocker/High ফিক্স করে, তারপর commit+push।
 
@@ -49,3 +51,6 @@
   এটা DB বন্ধ থাকার মতো দেখায়, কিন্তু আসলে cwd-র সমস্যা
 - টেস্টে `logger: false` থাকায় 500-এর আসল কারণ লুকিয়ে থাকে। ডিবাগ করতে
   সাময়িকভাবে সরাও, কাজ শেষে ফিরিয়ে দাও
+- **schema-তে নতুন model যোগ করলে `npx prisma generate` চালাও** (apps/api থেকে),
+  নইলে `tx.payment does not exist` ধরনের TS error আসে — migration চললেও
+  client-এ নতুন টাইপ আসে না

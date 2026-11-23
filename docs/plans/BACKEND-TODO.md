@@ -56,12 +56,12 @@
 
 ---
 
-## Phase 05 — Payments (ছোট রাখা হচ্ছে)
+## Phase 05 — Payments ✅ (গেটওয়ে পরে)
 
-- [ ] 5.1 Schema: `Payment` — COD + manual entry
-- [ ] 5.2 `PaymentProvider` interface + `mock` adapter
-- [ ] 5.3 **টেস্ট:** আংশিক পেমেন্ট, due হিসাব (integer paisa)
-- [ ] 5.4 PDF invoice
+- [x] 5.1 Schema: `Payment` — COD + manual entry
+- [x] 5.2 `PaymentProvider` interface + `ManualPaymentProvider`
+- [x] 5.3 **টেস্ট:** আংশিক পেমেন্ট, due হিসাব (integer paisa), void, role
+- [ ] 5.4 PDF invoice — **Phase 07-এ সরানো হলো**, UI-র সাথে
 - [ ] ~~bKash/SSLCommerz আসল integration~~ — **পরে**, interface তৈরি থাকবে
 
 ---
