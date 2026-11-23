@@ -66,13 +66,13 @@
 
 ---
 
-## Phase 06 — Order Lifecycle
+## Phase 06 — Order Lifecycle ✅
 
-- [ ] 6.1 Status state machine — কোন status থেকে কোথায় যাওয়া যায়
-- [ ] 6.2 **টেস্ট:** অবৈধ transition আটকাবে (Delivered → Pending নয়)
-- [ ] 6.3 Status change API + history log
-- [ ] 6.4 Public "Track My Order" — Order ID + ফোন দিয়ে, লগইন ছাড়া
-- [ ] 6.5 Admin order board — search, filter, pagination
+- [x] 6.1 Status state machine — কোন status থেকে কোথায় যাওয়া যায়
+- [x] 6.2 **টেস্ট:** অবৈধ transition আটকাবে (Delivered → Pending নয়)
+- [x] 6.3 Status change API + history log
+- [x] 6.4 Public "Track My Order" — Order ID + ফোন দিয়ে, লগইন ছাড়া
+- [x] 6.5 Admin order board — search, filter, pagination
 
 ---
 
