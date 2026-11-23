@@ -8,7 +8,6 @@ import {
   Req,
   Res,
   UnauthorizedException,
-  UsePipes,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { CookieOptions, Request, Response } from 'express';
@@ -46,9 +45,8 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @UsePipes(new ZodValidationPipe(registerSchema))
   async register(
-    @Body() body: RegisterInput,
+    @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponse> {
@@ -59,9 +57,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UsePipes(new ZodValidationPipe(loginSchema))
   async login(
-    @Body() body: LoginInput,
+    @Body(new ZodValidationPipe(loginSchema)) body: LoginInput,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponse> {

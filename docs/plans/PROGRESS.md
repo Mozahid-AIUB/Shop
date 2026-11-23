@@ -6,8 +6,8 @@
 |---|---|---|---|
 | 01 | Foundation (monorepo, Prisma, health) | ✅ শেষ | `01-foundation.md` |
 | 02 | Auth + RBAC | ✅ শেষ (backend) | `02-auth-rbac.md` |
-| 03 | Catalog + Inventory | ⬜ পরের কাজ | — |
-| 04 | Cart + Checkout + Order ID | ⬜ বাকি | — |
+| 03 | Catalog + Inventory | ✅ শেষ (backend) | `03-catalog.md` |
+| 04 | Cart + Checkout + Order ID | ⬜ পরের কাজ | — |
 | 05 | Payments (COD + manual, gateway পরে) | ⬜ বাকি | — |
 | 06 | Order Lifecycle + Tracking | ⬜ বাকি | — |
 | 07 | Admin Panel | ⬜ বাকি | — |
@@ -18,8 +18,8 @@
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening + Deploy | ⬜ বাকি | — |
 
-**এখন কোথায়:** Phase 02-এর backend শেষ — register/login/refresh/logout/me কাজ করে, ২৬টা টেস্ট সবুজ, lint পরিষ্কার, Super Admin seed হয়েছে। Next middleware (2.10) বাকি।
-**পরের কাজ:** Phase 03 — Catalog + Inventory। সব রকম প্রোডাক্ট সাপোর্ট করবে এমন নমনীয় variant + attribute schema।
+**এখন কোথায়:** Phase 02-03 backend শেষ — auth + RBAC, আর যেকোনো পণ্যের catalog (category গাছ, variant, attribute, atomic স্টক)। ৪৩টা API টেস্ট + ৩টা web টেস্ট সবুজ।
+**পরের কাজ:** Phase 04 — Cart + Checkout + Unique Order ID (concurrent-safe)। সাথে storefront ও admin UI।
 **Blocker:** নেই।
 
 **Push করার আগে `/ship-review` চালাও** — `.claude/skills/ship-review/`। lint+test+build চালায়, diff-এ secret খোঁজে, এই স্ট্যাকের security ও production-readiness checklist ধরে রিভিউ করে, Blocker/High ফিক্স করে, তারপর commit+push।

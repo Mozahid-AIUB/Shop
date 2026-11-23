@@ -31,13 +31,13 @@
 
 ## Phase 03 — Catalog + Inventory
 
-- [ ] 3.1 Schema: `Product`, `ProductVariant`, `Category` (গাছ), `ProductAttribute` — যেকোনো পণ্যে খাটানো যায় এমন
-- [ ] 3.2 **টেস্ট:** প্রোডাক্ট CRUD, শুধু admin role
-- [ ] 3.3 **টেস্ট:** স্টক — negative stock আটকাবে, concurrent decrement
-- [ ] 3.4 `ProductsService` + controller (admin CRUD)
-- [ ] 3.5 Public catalog API — list, filter, pagination, single product
-- [ ] 3.6 দাম **integer paisa**-তে — float নয়, টেস্টে প্রমাণ
-- [ ] 3.7 প্রোডাক্ট ছবি আপলোড — mime whitelist, সাইজ লিমিট, local disk adapter (পরে S3)
+- [x] 3.1 Schema: `Product`, `ProductVariant`, `Category` (গাছ), `ProductAttribute` — যেকোনো পণ্যে খাটানো যায় এমন
+- [x] 3.2 **টেস্ট:** প্রোডাক্ট CRUD, শুধু admin role
+- [x] 3.3 **টেস্ট:** স্টক — negative stock আটকাবে, concurrent decrement
+- [x] 3.4 `ProductsService` + controller (admin CRUD)
+- [x] 3.5 Public catalog API — list, filter, pagination, single product
+- [x] 3.6 দাম **integer paisa**-তে — float নয়, টেস্টে প্রমাণ
+- [x] 3.7 প্রোডাক্ট ছবি আপলোড — mime whitelist, সাইজ লিমিট, local disk adapter (পরে S3)
 
 ---
 
