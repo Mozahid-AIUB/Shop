@@ -1,16 +1,21 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    // CommonJS — api (NestJS) এটাই চায়; web-এর bundler দুটোই পড়তে পারে
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "lib": ["ES2022"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "noEmit": true
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

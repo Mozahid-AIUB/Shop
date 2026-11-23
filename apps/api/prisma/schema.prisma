@@ -31,6 +31,134 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshTokens RefreshToken[]
+
   @@index([role])
   @@map("users")
+}
+
+/// লগইন সেশন. কাঁচা টোকেন কখনো এখানে থাকবে না — শুধু sha256 hash,
+/// যাতে DB লিক হলেও কারো সেশন হাইজ্যাক করা না যায়।
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  /// একটা লগইন থেকে জন্মানো সব টোকেনের একই familyId। rotate হলে নতুন row পায়
+  /// কিন্তু family একই থাকে — মুছে ফেলা টোকেন আবার এলে এই family ধরেই চুরি ধরা পড়ে।
+  familyId  String
+  /// rotate হয়ে যাওয়া টোকেন সঙ্গে সঙ্গে মুছি না — ফিরে এলে যেন চিনতে পারি
+  revokedAt DateTime?
+  /// audit — কোন device/IP থেকে সেশনটা শুরু হয়েছিল
+  userAgent String?
+  ip        String?
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/// ক্যাটাগরি — সর্বোচ্চ দুই স্তর ("ইলেকট্রনিক্স > ফোন")।
+/// গভীরতার নিয়ম DB নয়, service-এ প্রয়োগ হয়: parent-এর নিজের parent থাকলে বাতিল।
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  products  Product[]
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+
+  @@index([parentId, sortOrder])
+  @@map("categories")
+}
+
+/// যেকোনো ধরনের পণ্য। ধরনভেদে আলাদা ফিল্ড নয় —
+/// যা আলাদা তা `ProductAttribute`-এ key-value হয়ে বসে।
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  categoryId  String
+  /// খসড়া প্রোডাক্ট storefront-এ কোথাও দেখা যাবে না
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category   Category           @relation(fields: [categoryId], references: [id])
+  variants   ProductVariant[]
+  images     ProductImage[]
+  attributes ProductAttribute[]
+
+  /// storefront-এর প্রধান দুই query: ক্যাটাগরিভিত্তিক তালিকা আর নতুন পণ্য
+  @@index([categoryId, isPublished])
+  @@index([isPublished, createdAt])
+  @@map("products")
+}
+
+/// বিক্রির আসল একক। দাম আর স্টক এখানে, Product-এ নয় —
+/// কারণ একই শার্টের M আর XL-এর দাম ও স্টক আলাদা হতে পারে।
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  sku       String  @unique
+  /// paisa — ১০০ টাকা = 10000. float কখনো নয়
+  pricePaisa Int
+  /// কাটার আগের দাম, ছাড় দেখাতে
+  comparePricePaisa Int?
+  stock     Int     @default(0)
+  isActive  Boolean @default(true)
+
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options VariantOption[]
+
+  @@index([productId, isActive])
+  @@map("product_variants")
+}
+
+/// "Color: Red", "Size: XL", "Storage: 256GB" — নাম হার্ডকোড নয়,
+/// তাই জামা আর ফোন একই কাঠামোয় বসে।
+model VariantOption {
+  id        String @id @default(cuid())
+  variantId String
+  name      String
+  value     String
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([variantId, name])
+  @@index([name, value])
+  @@map("variant_options")
+}
+
+/// প্রোডাক্ট পর্যায়ের বৈশিষ্ট্য — "Fabric: Cotton", "Warranty: 1 year"।
+model ProductAttribute {
+  id        String @id @default(cuid())
+  productId String
+  name      String
+  value     String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, name])
+  @@map("product_attributes")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
 }

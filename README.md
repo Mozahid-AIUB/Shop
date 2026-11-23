@@ -12,7 +12,7 @@
 cp .env.example .env
 npm install
 npm run docker:up                    # Postgres + Redis + MinIO
-npm run db:migrate -w @tshirt/api    # টেবিল তৈরি
+npm run db:migrate -w @shop/api    # টেবিল তৈরি
 npm run dev                          # api :4000 · web :3000
 ```
 

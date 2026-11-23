@@ -1,5 +1,5 @@
 {
-  "name": "@tshirt/web",
+  "name": "@shop/web",
   "version": "0.1.0",
   "private": true,
   "description": "Next.js storefront, design studio and admin panel",
@@ -11,7 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tshirt/shared": "*",
+    "@shop/shared": "*",
     "next": "16.2.12",
     "react": "19.2.8",
     "react-dom": "19.2.8"

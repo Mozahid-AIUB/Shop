@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { HealthResponse } from '@tshirt/shared';
+import type { HealthResponse } from '@shop/shared';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
