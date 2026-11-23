@@ -1,9 +1,11 @@
 import react from '@vitejs/plugin-react';
-import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
+
+const root = import.meta.dirname;
 
 export default defineConfig({
   plugins: [react()],
+  root,
   test: {
     environment: 'jsdom',
     globals: true,
@@ -12,8 +14,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': resolve(__dirname, '.'),
-      '@shop/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
+      '@': root,
+      '@shop/shared': `${root}/../../packages/shared/src/index.ts`,
     },
   },
 });

@@ -2,7 +2,7 @@
   "name": "shop-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Professional e-commerce platform — catalog, orders, payments, courier, admin",
+  "description": "Professional e-commerce platform \u2014 catalog, orders, payments, courier, admin",
   "engines": {
     "node": ">=22"
   },
@@ -15,14 +15,15 @@
     "dev:api": "npm run dev -w @shop/api",
     "dev:web": "npm run dev -w @shop/web",
     "build": "npm run build -w @shop/api && npm run build -w @shop/web",
-    "test": "npm run test -w @shop/api && npm run test -w @shop/web",
+    "test": "npm run test -w @shop/api && npm run test:web",
     "lint": "npm run lint -w @shop/api && npm run lint -w @shop/web",
     "db:migrate": "npm run db:migrate -w @shop/api",
     "db:studio": "npm run db:studio -w @shop/api",
     "db:seed": "npm run db:seed -w @shop/api",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "docker:reset": "docker compose -f docker/docker-compose.yml down -v"
+    "docker:reset": "docker compose -f docker/docker-compose.yml down -v",
+    "test:web": "node scripts/run-web-tests.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
