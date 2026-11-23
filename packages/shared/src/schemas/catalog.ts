@@ -116,9 +116,20 @@ export const createProductSchema = z.object({
   images: z.array(productImageSchema).max(20).default([]),
 });
 
-export const updateProductSchema = createProductSchema
-  .omit({ variants: true })
-  .partial();
+/**
+ * সম্পাদনায় variant বাদ — দাম আর স্টক বদলানোর নিজস্ব পথ আছে।
+ * আলাদা করে লেখা হয়েছে (`.omit().partial()` নয়) — নেস্টেড array সহ
+ * স্কিমায় ওই চেইন TypeScript-এ গভীর টাইপ রিকারশন তৈরি করে।
+ */
+export const updateProductSchema = z.object({
+  name: z.string().trim().min(1).max(200).optional(),
+  slug: slugSchema.optional(),
+  description: z.string().trim().max(5000).nullable().optional(),
+  categoryId: z.string().cuid().optional(),
+  isPublished: z.boolean().optional(),
+  attributes: z.array(productAttributeSchema).max(50).optional(),
+  images: z.array(productImageSchema).max(20).optional(),
+});
 
 // ---------- Public catalog query ----------
 
