@@ -83,8 +83,8 @@ describe('order status transitions', () => {
     });
 
     it('leaves every other status with somewhere to go', () => {
-      const open = ORDER_STATUSES.filter(
-        (status) => status !== 'DELIVERED' && status !== 'CANCELLED',
+      const open: readonly OrderStatus[] = ORDER_STATUSES.filter(
+        (status: OrderStatus) => status !== 'DELIVERED' && status !== 'CANCELLED',
       );
 
       for (const status of open) {

@@ -45,6 +45,12 @@ jobs:
       - name: Generate Prisma client
         run: npm run db:generate -w @shop/api
 
+      # api আর web দুটোই `@shop/shared`-এর dist থেকে টাইপ পড়ে, আর dist
+      # কমিট করা হয় না। fresh checkout-এ এটা না চালালে প্রতিটা suite
+      # "Cannot find module '@shop/shared'" দিয়ে ভাঙে।
+      - name: Build shared package
+        run: npm run build -w @shop/shared
+
       - run: npm run lint
 
       - run: npm run test
