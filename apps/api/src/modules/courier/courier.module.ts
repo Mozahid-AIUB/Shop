@@ -9,6 +9,7 @@ import {
 import { CourierRegistry } from './courier.registry';
 import { CourierService } from './courier.service';
 import { ManualProvider } from './providers/manual.provider';
+import { SteadfastProvider } from './providers/steadfast.provider';
 
 /**
  * কুরিয়ার (Phase 10)।
@@ -24,7 +25,13 @@ import { ManualProvider } from './providers/manual.provider';
 @Module({
   imports: [OrdersModule],
   controllers: [CourierAdminController, ShipmentAdminController, CourierWebhookController],
-  providers: [ManualProvider, CourierRegistry, CourierAccountService, CourierService],
+  providers: [
+    ManualProvider,
+    SteadfastProvider,
+    CourierRegistry,
+    CourierAccountService,
+    CourierService,
+  ],
   exports: [CourierService, CourierAccountService],
 })
 export class CourierModule {}

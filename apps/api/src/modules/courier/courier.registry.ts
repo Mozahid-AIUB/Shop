@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Courier } from '@shop/shared';
 import type { CourierProvider } from './courier.provider';
 import { ManualProvider } from './providers/manual.provider';
+import { SteadfastProvider } from './providers/steadfast.provider';
 
 /**
  * কোন কুরিয়ারের জন্য কোন adapter।
@@ -10,18 +11,23 @@ import { ManualProvider } from './providers/manual.provider';
  * শুধু এখানে একটা লাইন লাগে। `switch` ছড়িয়ে থাকলে একটা জায়গা
  * ভুলে গেলে ওই কুরিয়ারে সব ঠিক দেখাত অথচ কাজ করত না।
  *
- * **এখন শুধু `MANUAL` আছে** — key ছাড়াই চলে, তাই যে দোকান এখনো
- * কুরিয়ারের সাথে চুক্তি করেনি সেও আজই অর্ডার পাঠাতে পারে।
- * Steadfast, Pathao, RedX, Carrybee-র adapter আলাদা করে আসবে,
- * কারণ প্রত্যেকের auth আলাদা আর তাদের আসল ডকুমেন্টেশন merchant
- * dashboard-এ থাকে — অনুমান করে লিখলে চারটাই ভুল হতো।
+ * **`MANUAL` key ছাড়াই চলে**, তাই যে দোকান এখনো কুরিয়ারের সাথে
+ * চুক্তি করেনি সেও আজই অর্ডার পাঠাতে পারে।
+ *
+ * **Steadfast** তাদের merchant dashboard-এর API guide ধরে লেখা।
+ * Pathao, RedX আর Carrybee বাকি — প্রত্যেকের auth আলাদা আর আসল
+ * ডকুমেন্টেশন merchant dashboard-এ থাকে। অনুমান করে লিখলে key
+ * বসানোর পর ব্যর্থ হতো আর বোঝা যেত না ভুলটা key-তে না কোডে।
  */
 @Injectable()
 export class CourierRegistry {
   private readonly providers: Map<Courier, CourierProvider>;
 
-  constructor(manual: ManualProvider) {
-    this.providers = new Map<Courier, CourierProvider>([[manual.kind, manual]]);
+  constructor(manual: ManualProvider, steadfast: SteadfastProvider) {
+    this.providers = new Map<Courier, CourierProvider>([
+      [manual.kind, manual],
+      [steadfast.kind, steadfast],
+    ]);
   }
 
   /**

@@ -54,7 +54,14 @@ Phase 10 (Courier) — **ভিত্তি শেষ, নিজের ডেল
 key DB-তে AES-256-GCM দিয়ে এনক্রিপ্টেড, response-এ কখনো ফেরে না
 (শুধু শেষ ৪ অক্ষর), আর webhook secret ছাড়া webhook ৪০১।
 
-**বাকি: চারটা adapter** (Steadfast, Pathao, RedX, Carrybee)।
+**Steadfast adapter তৈরি** — মালিক তাদের merchant API guide দিয়েছে।
+ডক পড়েই তিনটা ভুল আটকানো গেল: `cod_amount` টাকায় (paisa পাঠালে ১০০
+গুণ টাকা তোলা হতো), `delivered_approval_pending` ≠ delivered (রাইডারের
+দাবি, নিশ্চয়তা নয় — ডকেই লেখা "do not settle your books on it"), আর
+একই invoice দুবার নেয় না — শেষটা **আমাদের নিজের একটা বাগ ধরিয়ে দিল**:
+ফেরত আসা অর্ডার আবার পাঠাতে গেলে একই নম্বর যেত আর তারা না বলত।
+
+**বাকি: তিনটা adapter** (Pathao, RedX, Carrybee)।
 চারটার কারোরই আসল API ডক পাবলিক নয় — শুধু third-party wrapper, আর
 তাদের মধ্যেই অমিল। অনুমান করে লিখলে key বসানোর পর ব্যর্থ হতো আর
 কারণ বোঝা যেত না। **মালিকের merchant dashboard-এর ডক + sandbox key
@@ -79,7 +86,7 @@ Phase 18 (Guest Checkout) শেষ — **অ্যাকাউন্ট ছা�
   খুলেছি)। ছোট অর্ডারে ধরা হয় না, নইলে অ্যাডমিন তালিকা পড়াই
   বন্ধ করে দিত।
 
-**৩৯৯টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint (তিন প্যাকেজেই),
+**৪৩০টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint (তিন প্যাকেজেই),
 coverage threshold আর build পরিষ্কার।
 
 **এখন যা বাকি — তিনটাই মালিকের ব্যবস্থার অপেক্ষায়:**

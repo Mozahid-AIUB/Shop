@@ -247,6 +247,17 @@ export class CourierService {
   ): ParcelRequest {
     return {
       orderNumber: order.orderNumber,
+      /**
+       * পুনঃপ্রেরণে আলাদা reference।
+       *
+       * কুরিয়াররা একই invoice দুবার নেয় না। আগের পার্সেলগুলো গোনা
+       * হয় (ফেরত আসা সহ), তাই দ্বিতীয়বারে `-R2` যায়। না করলে
+       * ফেরত আসা পণ্য আর কখনো পাঠানো যেত না।
+       */
+      parcelReference:
+        order.shipments.length === 0
+          ? order.orderNumber
+          : `${order.orderNumber}-R${order.shipments.length + 1}`,
       recipientName: order.shipFullName,
       recipientPhone: order.shipPhone,
       recipientAddress: [order.shipLine1, order.shipLine2].filter(Boolean).join(', '),
