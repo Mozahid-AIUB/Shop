@@ -412,11 +412,253 @@ describe('Guest checkout', () => {
         .expect(201);
 
       const tracked = await request(app.getHttpServer())
-        .post('/orders/track')
+        .post('/track')
         .send({ orderNumber: order.body.orderNumber, phone })
         .expect(200);
 
       expect(tracked.body.orderNumber).toBe(order.body.orderNumber);
+    });
+  });
+
+  describe('the guest cart survives a login', () => {
+    /**
+     * **ব্যবসায়িকভাবে সবচেয়ে দরকারি টেস্ট।**
+     *
+     * ক্রেতা কার্ট ভরে, তারপর চেকআউটে গিয়ে লগইন করে। মেশানো না
+     * হলে ঠিক সেই মুহূর্তে তার কার্ট খালি হয়ে যেত — যে ক্রেতা
+     * কিনতে সবচেয়ে কাছে এসেছে, তাকেই হারানো হতো।
+     *
+     * ফ্রন্টএন্ড লগইনের পরপর `POST /cart/merge` ডাকে।
+     */
+    it('moves guest items into the account cart on login', async () => {
+      const email = `gc-merge-${stamp}@test.local`;
+      const registered = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password, name: 'Merge Buyer' })
+        .expect(201);
+
+      const token = registered.body.accessToken;
+
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+      const guestToken = session.body.guestToken;
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(guestToken))
+        .send({ variantId, quantity: 2 })
+        .expect(201);
+
+      const merged = await request(app.getHttpServer())
+        .post('/cart/merge')
+        .set(authed(token))
+        .set(asGuest(guestToken))
+        .expect(200);
+
+      expect(merged.body.items).toHaveLength(1);
+      expect(merged.body.items[0].quantity).toBe(2);
+
+      // গেস্ট কার্ট আর নেই — নইলে পরে আবার মেশানো যেত
+      const guestCart = await request(app.getHttpServer())
+        .get('/cart')
+        .set(asGuest(guestToken))
+        .expect(200);
+
+      expect(guestCart.body.items).toHaveLength(0);
+
+      await prisma.user.deleteMany({ where: { email } });
+    });
+
+    /**
+     * দুই কার্টে একই পণ্য থাকলে **পরিমাণ যোগ হয়**, একটা অন্যটাকে
+     * মুছে দেয় না।
+     *
+     * মুছে দিলে ক্রেতা ভাবত কিছু হারিয়ে গেছে। যোগ করাটাও নিখুঁত
+     * নয় (সে হয়তো ২টাই চেয়েছিল), কিন্তু "কম দেখানো"-র চেয়ে
+     * "বেশি দেখানো" ভালো — কার্টে সংখ্যা কমানো এক ক্লিকের কাজ,
+     * আর হারানো পণ্য সে আর খুঁজেই পেত না।
+     */
+    it('adds up quantities when both carts hold the same item', async () => {
+      const email = `gc-merge2-${stamp}@test.local`;
+      const registered = await request(app.getHttpServer())
+        .post('/auth/register')
+        .send({ email, password, name: 'Merge Buyer Two' })
+        .expect(201);
+
+      const token = registered.body.accessToken;
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(authed(token))
+        .send({ variantId, quantity: 1 })
+        .expect(201);
+
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(session.body.guestToken))
+        .send({ variantId, quantity: 3 })
+        .expect(201);
+
+      const merged = await request(app.getHttpServer())
+        .post('/cart/merge')
+        .set(authed(token))
+        .set(asGuest(session.body.guestToken))
+        .expect(200);
+
+      expect(merged.body.items).toHaveLength(1);
+      expect(merged.body.items[0].quantity).toBe(4);
+
+      await prisma.user.deleteMany({ where: { email } });
+    });
+
+    /**
+     * গেস্ট টোকেন ছাড়া মেশানোর কিছু নেই — নিজের কার্টই ফেরে।
+     *
+     * ত্রুটি দেওয়া হয় না: ফ্রন্টএন্ড লগইনের পর সবসময় এটা ডাকবে,
+     * আর টোকেন না থাকাটা স্বাভাবিক (সরাসরি লগইন পাতায় আসা ক্রেতা)।
+     */
+    it('is harmless when there is no guest token', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/cart/merge')
+        .set(authed(memberToken))
+        .expect(200);
+
+      expect(Array.isArray(response.body.items)).toBe(true);
+    });
+
+    /** লগইন ছাড়া মেশানো যায় না — কোথায় মেশাব তা জানা নেই। */
+    it('refuses to merge without a login', async () => {
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cart/merge')
+        .set(asGuest(session.body.guestToken))
+        .expect(401);
+    });
+
+    /**
+     * অন্যের টোকেন বসিয়ে তার কার্ট **চুরি** করা যায় কিনা।
+     *
+     * যায় — এবং এটা মেনে নেওয়া সিদ্ধান্ত: টোকেনটাই কার্টের একমাত্র
+     * চাবি, আর সেটা ৩২ বাইট random। যার কাছে টোকেন আছে, কার্ট
+     * তার — ঠিক যেমন সেশন cookie। এখানে যাচাই করা হচ্ছে যে
+     * **অনুমান করা** টোকেনে কিছু পাওয়া যায় না।
+     */
+    it('merges nothing for a made-up guest token', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/cart/merge')
+        .set(authed(memberToken))
+        .set(asGuest(`gtok-${stamp}-not-a-real-token-at-all`))
+        .expect(200);
+
+      const quantities = response.body.items.map((item: { quantity: number }) => item.quantity);
+
+      expect(quantities).not.toContain(99);
+    });
+  });
+
+  describe('the shop owner sees guest orders', () => {
+    /**
+     * **মালিকের দিক থেকে সবচেয়ে দরকারি টেস্ট।**
+     *
+     * গেস্ট অর্ডার অ্যাডমিন প্যানেলে না দেখালে পুরো সুবিধাটাই
+     * অর্থহীন — অর্ডার আসত কিন্তু কেউ জানত না, পণ্য পাঠানো হতো না।
+     *
+     * ক্রেতার নাম আর ফোন `shipFullName`/`shipPhone`-এ থাকে, তাই
+     * অ্যাকাউন্ট না থাকলেও মালিকের কাছে পাঠানোর আর ফোন করার সব
+     * তথ্য থাকে।
+     */
+    it('lists a guest order in the admin board with a name and phone', async () => {
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+      const phone = nextPhone();
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(session.body.guestToken))
+        .send({ variantId, quantity: 1 })
+        .expect(201);
+
+      const order = await request(app.getHttpServer())
+        .post('/orders')
+        .set(asGuest(session.body.guestToken))
+        .send({ address: guestAddress(phone) })
+        .expect(201);
+
+      const board = await request(app.getHttpServer())
+        .get('/admin/orders')
+        .set(authed(adminToken))
+        .expect(200);
+
+      const row = board.body.orders.find(
+        (entry: { orderNumber: string }) => entry.orderNumber === order.body.orderNumber,
+      );
+
+      expect(row).toBeDefined();
+      expect(row.shipFullName).toBe('Guest Buyer');
+      expect(row.shipPhone).toBe(phone);
+    });
+
+    /**
+     * বিস্তারিত পাতাও খোলে — **`user` `null` হলেও ভাঙে না**।
+     *
+     * `Order.userId` nullable করার পর এটাই সবচেয়ে সহজে ভাঙার
+     * জায়গা ছিল: অ্যাডমিনের query `user`-ও আনে, আর কোথাও
+     * `user.name` ধরে নিলে গেস্ট অর্ডার খুলতেই ৫০০ হতো।
+     */
+    it('opens a guest order detail with no account attached', async () => {
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(session.body.guestToken))
+        .send({ variantId, quantity: 1 })
+        .expect(201);
+
+      const order = await request(app.getHttpServer())
+        .post('/orders')
+        .set(asGuest(session.body.guestToken))
+        .send({ address: guestAddress() })
+        .expect(201);
+
+      const detail = await request(app.getHttpServer())
+        .get(`/admin/orders/${order.body.orderNumber}`)
+        .set(authed(adminToken))
+        .expect(200);
+
+      expect(detail.body.user).toBeNull();
+      expect(detail.body.items).toHaveLength(1);
+      // ঝুঁকির হিসাবও হয় — গেস্ট অর্ডারে সেটা বাদ পড়লে COD ঝুঁকি অদেখা থাকত
+      expect(detail.body.fraudCheck).not.toBeNull();
+    });
+
+    /**
+     * গেস্ট নিজের অর্ডার বাতিল করতে পারে না — তার পরিচয় নেই।
+     *
+     * এটা **নিরাপদে** ব্যর্থ হতে হবে। `userId` nullable হওয়ার পর
+     * সার্ভিস `where: { orderNumber, userId }`-এ `null` পেলে
+     * অন্য গেস্টের অর্ডার বাতিল করে ফেলত।
+     */
+    it('refuses to cancel a guest order without a login', async () => {
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(session.body.guestToken))
+        .send({ variantId, quantity: 1 })
+        .expect(201);
+
+      const order = await request(app.getHttpServer())
+        .post('/orders')
+        .set(asGuest(session.body.guestToken))
+        .send({ address: guestAddress() })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post(`/orders/${order.body.orderNumber}/cancel`)
+        .set(asGuest(session.body.guestToken))
+        .send({ reason: 'মত বদলেছে' })
+        .expect(401);
     });
   });
 
@@ -452,6 +694,92 @@ describe('Guest checkout', () => {
 
       await prisma.coupon.deleteMany({ where: { code } });
     });
+
+    /**
+     * সীমা তুলে দিলে গেস্টও পায় — **মালিকের সিদ্ধান্ত**।
+     *
+     * `maxUsesPerUser: null` মানে প্রতি-ক্রেতা সীমা নেই, তাই কারো
+     * ব্যবহার গোনার দরকারই নেই আর গেস্টও কুপনটা পায়। ফেসবুক
+     * ক্যাম্পেইনের কুপন ঠিক এভাবেই বানাতে হবে, নইলে অ্যাডের
+     * ক্লিক থেকে আসা ক্রেতা কুপন বসিয়ে "লগইন করুন" দেখত।
+     */
+    it('honours a coupon with no per-customer limit', async () => {
+      const code = `GUESTOPEN${stamp}`;
+
+      await request(app.getHttpServer())
+        .post('/admin/coupons')
+        .set(authed(adminToken))
+        .send({ code, type: 'FIXED', value: 5_000, maxUsesPerUser: null })
+        .expect(201);
+
+      const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .set(asGuest(session.body.guestToken))
+        .send({ variantId, quantity: 1 })
+        .expect(201);
+
+      const order = await request(app.getHttpServer())
+        .post('/orders')
+        .set(asGuest(session.body.guestToken))
+        .send({ address: guestAddress(), couponCode: code })
+        .expect(201);
+
+      expect(order.body.discountPaisa).toBe(5_000);
+      expect(order.body.totalPaisa).toBe(
+        order.body.subtotalPaisa + order.body.shippingPaisa - 5_000,
+      );
+
+      /**
+       * ব্যবহারটা লেখা হয়েছে, `userId` ছাড়াই — অ্যাডমিনের রিপোর্টে
+       * ক্যাম্পেইনের আসল খরচ দেখাতে এটা দরকার।
+       */
+      const redemption = await prisma.couponRedemption.findFirst({
+        where: { coupon: { code } },
+      });
+
+      expect(redemption).not.toBeNull();
+      expect(redemption?.userId).toBeNull();
+      expect(redemption?.discountPaisa).toBe(5_000);
+
+      await prisma.couponRedemption.deleteMany({ where: { coupon: { code } } });
+      await prisma.coupon.deleteMany({ where: { code } });
+    });
+
+    /** একই কুপন দুই গেস্টেই চলে — সীমা নেই মানে সত্যিই নেই। */
+    it('lets a second guest use the same unlimited coupon', async () => {
+      const code = `GUESTTWICE${stamp}`;
+
+      await request(app.getHttpServer())
+        .post('/admin/coupons')
+        .set(authed(adminToken))
+        .send({ code, type: 'FIXED', value: 5_000, maxUsesPerUser: null })
+        .expect(201);
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const session = await request(app.getHttpServer()).post('/cart/guest').expect(201);
+
+        await request(app.getHttpServer())
+          .post('/cart/items')
+          .set(asGuest(session.body.guestToken))
+          .send({ variantId, quantity: 1 })
+          .expect(201);
+
+        await request(app.getHttpServer())
+          .post('/orders')
+          .set(asGuest(session.body.guestToken))
+          .send({ address: guestAddress(), couponCode: code })
+          .expect(201);
+      }
+
+      const uses = await prisma.couponRedemption.count({ where: { coupon: { code } } });
+
+      expect(uses).toBe(2);
+
+      await prisma.couponRedemption.deleteMany({ where: { coupon: { code } } });
+      await prisma.coupon.deleteMany({ where: { code } });
+    });
   });
 
   describe('guest orders are not claimed by an account', () => {
@@ -463,7 +791,7 @@ describe('Guest checkout', () => {
      * দেখে ফেলত। রেজিস্ট্রেশনে ফোন যাচাই হয় না (OTP Phase 08-এ),
      * তাই এখন জোড়া দেওয়া মানে একটা নীরব তথ্য ফাঁস।
      *
-     * গেস্ট তার অর্ডার `/orders/track`-এ ফোন + নম্বর দিয়ে দেখতে
+     * গেস্ট তার অর্ডার `/track`-এ ফোন + নম্বর দিয়ে দেখতে
      * পারে — সেটা দুটোই জানা লাগে, তাই অনুমান করে খোলা যায় না।
      */
     it('keeps a guest order out of a new account with the same phone', async () => {
@@ -502,7 +830,7 @@ describe('Guest checkout', () => {
 
       // কিন্তু ট্র্যাক করে ঠিকই দেখা যায়
       const tracked = await request(app.getHttpServer())
-        .post('/orders/track')
+        .post('/track')
         .send({ orderNumber: guestOrder.body.orderNumber, phone })
         .expect(200);
 
@@ -530,7 +858,7 @@ describe('Guest checkout', () => {
         .expect(201);
 
       await request(app.getHttpServer())
-        .post('/orders/track')
+        .post('/track')
         .send({ orderNumber: order.body.orderNumber, phone: nextPhone() })
         .expect(404);
     });

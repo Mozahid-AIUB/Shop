@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { assessFraud, type FraudAssessment, type FraudSignals } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -98,6 +99,28 @@ export class FraudService {
 
     const since = new Date(order.createdAt.getTime() - RAPID_WINDOW_HOURS * 3_600_000);
 
+    /**
+     * ক্রেতাকে চেনার শর্ত — **গেস্ট আর সদস্যের জন্য আলাদা**।
+     *
+     * সদস্যকে `userId` ধরে চেনা যায়। গেস্টের সেটা নেই, তাই ফোন
+     * নম্বরই তার একমাত্র পরিচয়।
+     *
+     * **`userId: null` দিয়ে কখনো খোঁজা যাবে না** — সেটা **সব
+     * গেস্টের** অর্ডার একসাথে গুনত, মানে এক গেস্টের বাতিল অর্ডারের
+     * দোষ বাকি সব গেস্টের ঘাড়ে পড়ত আর সবাই HIGH ঝুঁকি দেখাত।
+     *
+     * ফোন ধরে গোনাটা আসলে **শক্ত** সংকেত: নতুন অ্যাকাউন্ট খোলা
+     * সহজ, কিন্তু নম্বর বদলানো কঠিন।
+     */
+    const identity: Prisma.OrderWhereInput =
+      order.userId === null ? { shipPhone: order.shipPhone } : { userId: order.userId };
+
+    /** "অন্য কেউ" — সদস্যের বেলায় অন্য অ্যাকাউন্ট, গেস্টের বেলায় অন্য ফোন। */
+    const someoneElse: Prisma.OrderWhereInput =
+      order.userId === null
+        ? { shipPhone: { not: order.shipPhone } }
+        : { userId: { not: order.userId } };
+
     const [failedOrders, successfulOrders, recentOrderCount, addressUsedByOthers] =
       await Promise.all([
         /**
@@ -114,11 +137,11 @@ export class FraudService {
          * তখন "নেয়নি" আর "বাতিল করেছে" আলাদা সংকেত হবে।
          */
         this.prisma.order.count({
-          where: { userId: order.userId, status: 'CANCELLED' },
+          where: { ...identity, status: 'CANCELLED' },
         }),
 
         this.prisma.order.count({
-          where: { userId: order.userId, status: 'DELIVERED' },
+          where: { ...identity, status: 'DELIVERED' },
         }),
 
         /**
@@ -142,21 +165,32 @@ export class FraudService {
             where: {
               shipLine1: order.shipLine1,
               shipCity: order.shipCity,
-              userId: { not: order.userId },
+              ...someoneElse,
             },
             select: { id: true },
           })
           .then((found) => found !== null),
       ]);
 
-    const accountAgeMs = order.createdAt.getTime() - order.user.createdAt.getTime();
+    /**
+     * গেস্টের অ্যাকাউন্ট নেই, তাই বয়সও নেই — `null`।
+     *
+     * `0` দেওয়া যেত না: তাহলে প্রতিটা গেস্ট অর্ডার "আজ খোলা
+     * অ্যাকাউন্ট" হিসেবে গোনা হতো, আর অ্যাডমিন প্যানেলে "অ্যাকাউন্ট
+     * ০ দিনের" লেখা দেখে বিভ্রান্ত হতো। `assessFraud` `null`-কে
+     * আলাদা সংকেত হিসেবে দেখে।
+     */
+    const accountAgeDays =
+      order.user === null
+        ? null
+        : Math.floor((order.createdAt.getTime() - order.user.createdAt.getTime()) / 86_400_000);
 
     return {
       failedOrders,
       successfulOrders,
       // এই অর্ডারটা নিজেই গোনায় আছে, তাই আগেরগুলো বাদ দেওয়ার দরকার নেই
       recentOrderCount,
-      accountAgeDays: Math.floor(accountAgeMs / 86_400_000),
+      accountAgeDays,
       orderTotalPaisa: order.totalPaisa,
       largeOrderPaisa: this.largeOrderPaisa(),
       addressUsedByOthers,

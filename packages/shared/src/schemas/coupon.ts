@@ -64,7 +64,14 @@ const couponShape = {
 
   /** `null` = সীমা নেই */
   maxUses: z.number().int().min(1, 'সর্বোচ্চ ব্যবহার অন্তত ১').nullable().default(null),
-  maxUsesPerUser: z.number().int().min(1, 'প্রতি ক্রেতা অন্তত ১').default(1),
+  /**
+   * `null` = প্রতি-ক্রেতা সীমা নেই, তখন **গেস্টও** কুপনটা পায়।
+   *
+   * ডিফল্ট `1` — অ্যাডমিন কিছু না বললে কুপন একজনের একবার, কারণ
+   * সেটাই নিরাপদ অনুমান। গেস্টকেও দিতে চাইলে স্পষ্ট করে `null`
+   * পাঠাতে হবে, যাতে সিদ্ধান্তটা ইচ্ছাকৃত হয়।
+   */
+  maxUsesPerUser: z.number().int().min(1, 'প্রতি ক্রেতা অন্তত ১').nullable().default(1),
 
   isActive: z.boolean().default(true),
 };
@@ -146,7 +153,7 @@ export const couponUpdateSchema = z.object({
   startsAt: z.coerce.date().nullable().optional(),
   endsAt: z.coerce.date().nullable().optional(),
   maxUses: z.number().int().min(1).nullable().optional(),
-  maxUsesPerUser: z.number().int().min(1).optional(),
+  maxUsesPerUser: z.number().int().min(1).nullable().optional(),
   isActive: z.boolean().optional(),
 });
 

@@ -58,7 +58,14 @@ const toCouponLike = (row: CouponRow): CouponLike => ({
 
 export type ApplyCouponArgs = {
   code: string;
-  userId: string;
+  /**
+   * `null` = গেস্ট, অ্যাকাউন্ট ছাড়া কিনছে।
+   *
+   * তখন "এই ক্রেতা আগে কতবার নিয়েছে" গোনা যায় না, তাই প্রতি-ক্রেতা
+   * সীমাওয়ালা কুপন খাটে না — `evaluateCoupon` সেটা `LOGIN_REQUIRED`
+   * দিয়ে জানায়।
+   */
+  userId: string | null;
   subtotalPaisa: number;
   shippingPaisa: number;
 };
@@ -81,7 +88,7 @@ export class CouponService {
    */
   async validate(
     code: string,
-    userId: string,
+    userId: string | null,
     amounts: { subtotalPaisa: number; shippingPaisa: number },
   ): Promise<CouponValidateResult> {
     const normalized = normalizeCouponCode(code);
@@ -170,7 +177,7 @@ export class CouponService {
    */
   async recordRedemption(
     tx: Prisma.TransactionClient,
-    args: { couponId: string; userId: string; orderId: string } & CouponDiscount,
+    args: { couponId: string; userId: string | null; orderId: string } & CouponDiscount,
   ): Promise<void> {
     try {
       await tx.couponRedemption.create({
@@ -196,11 +203,24 @@ export class CouponService {
   private countUses(
     client: Prisma.TransactionClient | PrismaService,
     couponId: string,
-    userId: string,
-  ): Promise<[number, number]> {
+    userId: string | null,
+  ): Promise<[number, number | null]> {
     return Promise.all([
       client.couponRedemption.count({ where: { couponId } }),
-      client.couponRedemption.count({ where: { couponId, userId } }),
+      /**
+       * গেস্টের বেলায় `null` — **`0` নয়**।
+       *
+       * `0` মানে "গোনা হয়েছে, নেয়নি"; `null` মানে "গোনার উপায়ই
+       * নেই"। মিলিয়ে ফেললে সীমাওয়ালা কুপন গেস্টের কাছে প্রতিবার
+       * "প্রথমবার" দেখাত আর অসীমবার চলত।
+       *
+       * `where: { userId: null }` দিয়ে গুনলেও ভুল হতো — সেটা **সব
+       * গেস্টের** ব্যবহার একসাথে গুনত, মানে এক গেস্ট নিলে পরের
+       * গেস্ট আর পেত না।
+       */
+      userId === null
+        ? Promise.resolve(null)
+        : client.couponRedemption.count({ where: { couponId, userId } }),
     ]);
   }
 
