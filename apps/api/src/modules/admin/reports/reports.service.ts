@@ -94,11 +94,20 @@ export class ReportsService {
   async dailySales(input: ReportRange): Promise<DailySalesPoint[]> {
     const range = resolveRange(input);
 
+    /**
+     * তারিখটা **Postgres-এই** `YYYY-MM-DD` স্ট্রিং বানানো হয়,
+     * `Date` object হিসেবে নয়।
+     *
+     * `Date` ফেরত আনলে JavaScript সেটাকে সার্ভারের লোকাল সময়ে
+     * পড়ত — আর সার্ভার প্রায় সবসময় UTC (CI, VPS, Docker)। তখন
+     * ঢাকার ভোর ৫টার অর্ডার আগের দিনে দেখাতো। স্ট্রিং করে আনলে
+     * মাঝখানে টাইমজোন ঢোকার পথই থাকে না।
+     */
     const rows = await this.prisma.$queryRaw<
-      { date: Date; order_count: bigint; ordered_paisa: bigint | null }[]
+      { date: string; order_count: bigint; ordered_paisa: bigint | null }[]
     >`
       SELECT
-        date_trunc('day', "createdAt" AT TIME ZONE 'Asia/Dhaka') AS date,
+        to_char("createdAt" AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD') AS date,
         COUNT(*) AS order_count,
         SUM("totalPaisa") AS ordered_paisa
       FROM orders
@@ -110,7 +119,7 @@ export class ReportsService {
     `;
 
     return rows.map((row) => ({
-      date: toDateKey(row.date),
+      date: row.date,
       orderCount: Number(row.order_count),
       orderedPaisa: Number(row.ordered_paisa ?? 0),
     }));

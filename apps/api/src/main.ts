@@ -7,6 +7,18 @@ import helmet from 'helmet';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
+/**
+ * ব্যবসা বাংলাদেশে, তাই অ্যাপ সবসময় ঢাকার সময়ে দিন গোনে —
+ * সার্ভার যেখানেই থাকুক।
+ *
+ * VPS, Docker image আর CI runner প্রায় সবসময় UTC-তে চলে। এটা না
+ * বাঁধলে "আজকের বিক্রি" ভুল দিনে দেখাতো: ঢাকার ভোর ৫টার অর্ডার
+ * UTC-তে আগের দিনে পড়ে। সার্ভার বদলালে হিসাবও বদলে যাওয়া উচিত নয়।
+ *
+ * `TZ` দেওয়া থাকলে সেটাই মানা হয় — অন্য দেশে চালাতে হলে পথ খোলা।
+ */
+process.env.TZ = process.env.TZ ?? 'Asia/Dhaka';
+
 async function bootstrap(): Promise<void> {
   // bufferLogs — pino তৈরি হওয়ার আগের log-ও ধরা পড়বে
   // `NestExpressApplication` — `app.set('trust proxy', ...)` Express-এর নিজের
