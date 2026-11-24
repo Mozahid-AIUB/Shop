@@ -8,7 +8,7 @@ import {
   type VoidPaymentInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActivityLogService } from '../admin/activity-log.service';
+import { ActivityLogService } from '../admin/activity-log/activity-log.service';
 
 const PAYMENT_SELECT = {
   id: true,

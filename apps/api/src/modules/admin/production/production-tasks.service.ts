@@ -16,8 +16,8 @@ import {
   type TaskListQuery,
   type UpdateTaskInput,
 } from '@shop/shared';
-import { PrismaService } from '../../prisma/prisma.service';
-import { ActivityLogService } from './activity-log.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 const TASK_SELECT = {
   id: true,

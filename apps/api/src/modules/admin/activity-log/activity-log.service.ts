@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { ActivityAction, ActivityLogQuery } from '@shop/shared';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 const LOG_SELECT = {
   id: true,

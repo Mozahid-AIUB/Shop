@@ -1,22 +1,29 @@
 import { Module } from '@nestjs/common';
-import { ActivityLogService } from './activity-log.service';
+import { ActivityLogController } from './activity-log/activity-log.controller';
+import { ActivityLogService } from './activity-log/activity-log.service';
+import { InvoiceController } from './invoice/invoice.controller';
+import { InvoiceService } from './invoice/invoice.service';
 import {
-  ActivityLogController,
-  InvoiceController,
   ProductionTasksController,
   TaskManagementController,
-} from './admin.controller';
-import { InvoiceService } from './invoice.service';
-import { ProductionTasksService } from './production-tasks.service';
+} from './production/production-tasks.controller';
+import { ProductionTasksService } from './production/production-tasks.service';
+import { ReportsController } from './reports/reports.controller';
+import { ReportsService } from './reports/reports.service';
 
+/**
+ * অ্যাডমিন প্যানেল। প্রতিটা দায়িত্ব নিজের ফোল্ডারে —
+ * `production/`, `activity-log/`, `invoice/`, `reports/`।
+ */
 @Module({
   controllers: [
     ProductionTasksController,
     TaskManagementController,
     ActivityLogController,
     InvoiceController,
+    ReportsController,
   ],
-  providers: [ProductionTasksService, ActivityLogService, InvoiceService],
+  providers: [ProductionTasksService, ActivityLogService, InvoiceService, ReportsService],
   /**
    * `ActivityLogService` বাইরে দেওয়া হচ্ছে কারণ orders আর payments
    * module নিজেদের ঘটনা লিখবে — লগ এক জায়গা থেকেই লেখা হোক।

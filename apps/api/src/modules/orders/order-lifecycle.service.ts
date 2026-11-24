@@ -11,7 +11,7 @@ import {
   type TrackOrderInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ActivityLogService } from '../admin/activity-log.service';
+import { ActivityLogService } from '../admin/activity-log/activity-log.service';
 
 const DETAIL_SELECT = {
   id: true,
