@@ -321,6 +321,7 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  shipments        Shipment[]
   user             User?                @relation(fields: [userId], references: [id])
   address          Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
   items            OrderItem[]
@@ -682,4 +683,168 @@ model CouponRedemption {
   /// "এই ক্রেতা এই কুপন কতবার নিল" — প্রতি checkout-এ গোনা হয়
   @@index([couponId, userId])
   @@map("coupon_redemptions")
+}
+
+/// কোন কুরিয়ার। `MANUAL` = নিজের লোকে ডেলিভারি, কোনো API নেই
+enum CourierKind {
+  STEADFAST
+  PATHAO
+  REDX
+  CARRYBEE
+  MANUAL
+}
+
+/// পার্সেলের অবস্থা — কুরিয়ারের নিজের নাম এগুলোতে map হয়
+enum ShipmentStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  RETURNED
+  CANCELLED
+}
+
+/// কুরিয়ারের সেটআপ — **সব অ্যাডমিন প্যানেল থেকে, `.env`-এ কিছু নয়**।
+///
+/// **কেন DB-তে, env-এ নয়:** এই কোড অন্য ব্যবসায়ীদের কাছেও যাবে।
+/// key বদলাতে সার্ভারে SSH করে ফাইল এডিট করে রিস্টার্ট করতে হলে
+/// তারা পারত না। প্যানেল থেকে বসানো যায় বলে চুক্তি হওয়ার দিনই
+/// চালু করা যায়।
+///
+/// **একাধিক কুরিয়ার একসাথে** — ঢাকার ভেতরে এক কুরিয়ার, বাইরে
+/// আরেকটা রেখে খরচ কমানো যায়, আর একটা বন্ধ থাকলেও কাজ আটকায় না।
+model CourierAccount {
+  id   String      @id @default(cuid())
+  kind CourierKind @unique
+
+  /// প্যানেলে দেখানোর নাম — "Steadfast (মূল)" ইত্যাদি
+  label String
+
+  /**
+   * credential, **এনক্রিপ্ট করা JSON**।
+   *
+   * আলাদা কলাম নয় ইচ্ছাকৃতভাবে: চারটা কুরিয়ারের মাঠ একেবারে
+   * আলাদা। Steadfast-এ api-key + secret-key, Pathao-তে OAuth-র
+   * চারটা মান, RedX-এ একটা JWT, Carrybee-তে client id + secret +
+   * context। আলাদা কলাম রাখলে অর্ধেক কলাম সবসময় `null` থাকত আর
+   * নতুন কুরিয়ার যোগ করতে migration লাগত।
+   *
+   * `null` = এখনো key বসানো হয়নি (`MANUAL`-এ কখনো লাগে না)।
+   */
+  credentials String?
+
+  /// বন্ধ রাখার সুইচ — key মুছতে হবে না, চুক্তি ফিরলে আবার চালু
+  isActive Boolean @default(false)
+
+  /// কিছু না বাছলে এটাই — ঠিক একটাই `true` থাকে, service নিশ্চিত করে
+  isDefault Boolean @default(false)
+
+  /// sandbox/test mode — আসল পার্সেল না পাঠিয়ে পরীক্ষা করা যায়
+  isSandbox Boolean @default(false)
+
+  /**
+   * webhook যাচাইয়ের গোপন মান, **এনক্রিপ্ট করা**।
+   *
+   * ছাড়া webhook খোলা দরজা: যে কেউ "DELIVERED" পাঠিয়ে অর্ডার
+   * ডেলিভারড দেখাত, আর COD-র টাকা না পেয়েই হিসাব মিলে যেত।
+   */
+  webhookSecret String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shipments Shipment[]
+
+  @@map("courier_accounts")
+}
+
+/// পার্সেল — এক অর্ডার কুরিয়ারে গেলে একটা `Shipment` তৈরি হয়।
+///
+/// **অর্ডার আর পার্সেল আলাদা রাখা হয়** কারণ একটা অর্ডার ফেরত এসে
+/// আবার পাঠানো হতে পারে — তখন দুটো পার্সেল, একই অর্ডার। `Order`-এ
+/// ট্র্যাকিং নম্বর রাখলে দ্বিতীয়বারে প্রথমটার হিসাব হারিয়ে যেত।
+model Shipment {
+  id      String @id @default(cuid())
+  orderId String
+
+  courierAccountId String
+  courier          CourierKind
+
+  /**
+   * কুরিয়ারের দেওয়া আইডি। `null` = এখনো পাঠানো হয়নি বা `MANUAL`।
+   *
+   * `@unique` নয়: দুই কুরিয়ারের নম্বর মিলে যেতে পারে, আর তখন
+   * দ্বিতীয় পার্সেল তৈরিই হতো না। মিল ঠেকাতে
+   * `@@unique([courier, consignmentId])` ব্যবহার হয়।
+   */
+  consignmentId String?
+
+  /// ক্রেতাকে দেখানোর নম্বর — কুরিয়ারের সাইটে এটা দিয়ে খোঁজে
+  trackingCode String?
+
+  status ShipmentStatus @default(PENDING)
+
+  /// কুরিয়ারের নিজের ভাষার অবস্থা — map করার আগের কাঁচা মান
+  rawStatus String?
+
+  /// COD-তে কুরিয়ার কত টাকা তুলবে, paisa। `0` = আগেই পেমেন্ট হয়ে গেছে
+  codAmountPaisa Int @default(0)
+
+  /// কুরিয়ারের চার্জ, paisa — বিল মেলানোর জন্য
+  courierFeePaisa Int?
+
+  /// কেন ফেরত এলো — অ্যাডমিনের জানা দরকার, আর ঝুঁকির হিসাবেও লাগবে
+  failureReason String?
+
+  /**
+   * কুরিয়ারে পাঠানোর শেষ চেষ্টার ত্রুটি।
+   *
+   * রাখা হয় কারণ ব্যর্থতাটা সাধারণত key বা ঠিকানার সমস্যা, আর
+   * অ্যাডমিন সেটা না দেখলে শুধু "কাজ করছে না" বলতে পারত।
+   */
+  lastError String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  dispatchedAt DateTime?
+  deliveredAt  DateTime?
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account CourierAccount @relation(fields: [courierAccountId], references: [id])
+  events  ShipmentEvent[]
+
+  /// একই কুরিয়ারে একই নম্বর দুবার নয় — duplicate webhook-এর রক্ষা
+  @@unique([courier, consignmentId])
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@map("shipments")
+}
+
+/// পার্সেলের ইতিহাস — কুরিয়ার যা যা জানাল।
+///
+/// **আলাদা টেবিল, `Shipment.status` ছাড়াও:** শুধু শেষ অবস্থা রাখলে
+/// "কখন পিকআপ হলো, কখন ট্রানজিটে গেল" হারিয়ে যেত, আর দেরির
+/// অভিযোগে কুরিয়ারকে কিছু দেখানো যেত না।
+model ShipmentEvent {
+  id         String @id @default(cuid())
+  shipmentId String
+
+  status    ShipmentStatus
+  /// কুরিয়ারের কাঁচা মান — map না মিললেও তথ্যটা থাকে
+  rawStatus String?
+  note      String?
+
+  /// কুরিয়ার কখন ঘটনাটা ঘটেছে বলল — আমাদের `createdAt` থেকে আলাদা
+  occurredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  /**
+   * **একই ঘটনা দুবার নয়।** কুরিয়ার webhook প্রায়ই দুবার পাঠায়
+   * (retry), আর প্রতিবার নতুন row লিখলে ইতিহাস পড়া যেত না।
+   */
+  @@unique([shipmentId, status, occurredAt])
+  @@index([shipmentId, createdAt])
+  @@map("shipment_events")
 }
