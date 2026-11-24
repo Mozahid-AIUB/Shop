@@ -138,12 +138,12 @@
 
 ## Phase 13 — Hardening + Deploy
 
-- [ ] 13.1 Rate limit (`@nestjs/throttler`) — login, register, track order
-- [ ] 13.2 Helmet, CORS টাইট করা
-- [ ] 13.3 Structured log (pino) + request id
-- [ ] 13.4 DB backup cron
-- [ ] 13.5 VPS deploy — Docker ছাড়াও চলবে এমন ব্যবস্থা
-- [ ] 13.6 Playwright end-to-end — পুরো flow
+- [x] 13.1 Rate limit (`@nestjs/throttler`) — login, register, track order
+- [x] 13.2 Helmet, CORS টাইট করা
+- [x] 13.3 Structured log (pino) + request id
+- [ ] 13.4 DB backup cron — **আসল সার্ভার লাগবে**, deploy-এর সাথে
+- [ ] 13.5 VPS deploy — Docker ছাড়াও চলবে এমন ব্যবস্থা — **আসল সার্ভার লাগবে**
+- [ ] 13.6 Playwright end-to-end — পুরো flow — **UI লাগবে**
 
 ---
 

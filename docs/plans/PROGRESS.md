@@ -16,19 +16,35 @@
 | 10 | Courier (Steadfast/Pathao/RedX) | ⬜ বাকি | — |
 | 11 | Fraud Guard (COD risk) | ⬜ বাকি | — |
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
-| 13 | Hardening + Deploy | ⬜ বাকি | — |
+| 13 | Hardening (rate limit, helmet, log) | ✅ শেষ (backend) | `13-hardening.md` |
 
-**এখন কোথায়:** Phase 02-06 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
-Phase 07-এর **API শেষ** (branch `phase/07-admin-panel`) — `ProductionTask`
-(সাধারণ কাজের তালিকা: DESIGN/PRINT/PACKING/QC), assign ও status বদল,
-`ActivityLog` (অ্যাডমিনের লেখার কাজ, শুধু SUPER_ADMIN দেখে, মোছার API নেই),
-আর ইনভয়েসের ডেটা endpoint।
-**১৫৯টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint ও build পরিষ্কার
-(`dist` মুছে CI-র মতো অবস্থা থেকেও যাচাই করা)।
-**পরের কাজ:** Phase 09 — Reports (Phase 08-এ Redis লাগবে, তাই পরে)।
+**এখন কোথায়:** Phase 02-07 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
+Phase 13 (Hardening) **শেষ** — branch `phase/13-hardening`: rate limit
+(login ৫/মিনিট, register ১০/ঘণ্টা, `/track` ১০/মিনিট, গ্লোবাল ১০০/মিনিট;
+`/health` বাদ), helmet + কড়া CSP, pino structured log + `x-request-id`,
+আর সংবেদনশীল ফিল্ড (পাসওয়ার্ড, token, cookie, ফোন) redact।
+**১৭৪টা API টেস্ট (১৩টা suite) সবুজ**, lint ও build পরিষ্কার
+(`packages/shared/dist` মুছে CI-র মতো অবস্থা থেকেও যাচাই করা)।
+**পরের কাজ:** Phase 09 — Reports।
 সিদ্ধান্ত: আগে পুরো backend, UI তারপর।
 **Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
-Phase 12-এ Meta token নেই — ওই তিনটায় পৌঁছে ব্যবস্থা করতে হবে।
+Phase 12-এ Meta token নেই। বাইরের কিছু ছাড়াই এখন করা যায়: **09 আর 11**।
+
+**Phase 13-এ প্ল্যান থেকে সরানো:** DB backup cron আর VPS deploy (আসল সার্ভার
+লাগবে), Playwright E2E (UI লাগবে) — তিনটাই deploy-এর আগে, আলাদা phase-এ।
+rate limit এখন **মেমরিতে** — এক instance চলছে বলে যথেষ্ট। Redis বসলে
+(Phase 08) throttler storage ওখানে সরাতে হবে, নইলে একাধিক instance-এ
+সীমা আলাদা হিসাব করবে।
+
+## সিদ্ধান্ত — Admin কাঠামো (২৪ নভেম্বর ২০২৬)
+
+- **Permission:** এখনকার ৫টা role-ই থাকবে (`SUPER_ADMIN`, `ORDER_MANAGER`,
+  `DESIGNER`, `ACCOUNTANT`, `CUSTOMER`)। প্রতি-কর্মীর আলাদা permission table
+  **এখন নয়** — দরকার হলে পরে যোগ হবে। `ORDER_MANAGER` কার্যত moderator।
+- **Admin module ভাগ করা:** Phase 09-এর সাথে। এখন `modules/admin/` ফ্ল্যাট
+  (এক `admin.controller.ts`-এ ৪টা controller)। Reports লেখার সময় sub-folder-এ
+  ভাগ হবে: `production/`, `activity-log/`, `invoice/`, `reports/` — আলাদা
+  refactor commit লাগবে না।
 
 **Phase 07-এ প্ল্যান থেকে সরানো:** ফাইল আপলোড (print-ready design) — MinIO
 বসার পর Phase 08-এর সাথে হবে। আপলোড পুরো প্রোডাক্টের সবচেয়ে ঝুঁকিপূর্ণ জায়গা

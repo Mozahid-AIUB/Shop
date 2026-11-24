@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   cancelOrderSchema,
   changeOrderStatusSchema,
@@ -11,6 +12,7 @@ import {
   type TrackOrderInput,
 } from '@shop/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { THROTTLE_TRACK } from '../../common/throttle.config';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -79,10 +81,13 @@ export class OrderCancelController {
  * POST, GET নয়: ফোন নম্বর URL-এ গেলে সার্ভারের access log, ব্রাউজার
  * history আর referer header-এ জমা হতো।
  *
- * Rate limit Phase 13-এ পুরো অ্যাপে একসাথে বসবে — এই endpoint
- * সেখানে অগ্রাধিকার পাবে, কারণ এটাই খোলা আর অনুমানযোগ্য।
+ * মিনিটে ১০ বার — এটাই পুরো অ্যাপের সবচেয়ে আঁটসাঁট সীমা, কারণ
+ * এটাই একমাত্র খোলা endpoint যেখানে অনুমানযোগ্য আইডি দিয়ে
+ * ব্যক্তিগত তথ্য বের করা সম্ভব। আসল কাস্টমার একবার বা দুবার
+ * দেখে, ১০ বার নয়।
  */
 @Public()
+@Throttle({ [THROTTLE_TRACK]: {} })
 @Controller('track')
 export class OrderTrackingController {
   constructor(private readonly lifecycle: OrderLifecycleService) {}
