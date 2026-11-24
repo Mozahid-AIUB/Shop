@@ -87,6 +87,21 @@ credential query parameter-এ আসে, আর **একমাত্র কু�
 কারণ বোঝা যেত না। **মালিকের merchant dashboard-এর ডক + sandbox key
 লাগবে**; registry-তে একটা লাইন যোগ করলেই নতুন adapter বসে।
 
+**"শুধু টি-শার্ট" ধারণা মুছে ফেলা হয়েছে।** README, CLAUDE.md,
+master plan, হোমপেজের শিরোনাম আর ব্রাউজার ট্যাবের নাম — সবখানে
+আগে কাস্টম টি-শার্টের দোকান লেখা ছিল। এখন **যেকোনো পণ্যের**
+ই-কমার্স; কাস্টম ডিজাইন স্টুডিও একটা **ফিচার**, ভিত্তি নয়।
+infrastructure-এর নাম (`tshirt` DB role, `tshirt-designs` bucket)
+ইচ্ছাকৃতভাবে বদলানো হয়নি — ওগুলো চলমান install-এর আসল নাম,
+বদলালে সবাইকে DB নতুন করে বানাতে হতো, লাভ শূন্য।
+
+**web টেস্ট ভাঙা ছিল** (`Cannot read properties of undefined
+(reading 'config')`) — আমার কোডের দোষ নয়। `@testing-library/react`
+CJS আর সে `require('@testing-library/dom')` করে, কিন্তু Vite ওই
+package-এর `module` মাঠ দেখে **ESM** build ধরিয়ে দিত, যার namespace
+object-এ named export গুলো CJS-র মতো বসে না। `vitest.config.mts`-এ
+CJS build-টা alias করে দেখিয়ে দেওয়া হয়েছে।
+
 Phase 18 (Guest Checkout) শেষ — **অ্যাকাউন্ট ছাড়া কেনা যায়**।
 অর্ডার অ্যাডমিন প্যানেলে সদস্যের অর্ডারের মতোই দেখায় (নাম-ফোন
 `shipFullName`/`shipPhone`-এ থাকে)। তিনটা সিদ্ধান্ত নথিবদ্ধ:

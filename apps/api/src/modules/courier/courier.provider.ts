@@ -49,7 +49,7 @@ export type ParcelRequest = {
   codAmountPaisa: number;
 
   itemCount: number;
-  /** "2 x টি-শার্ট (L, কালো)" — কুরিয়ারের লোক বুঝে নেয় */
+  /** "2 x শার্ট (L, কালো)" বা "1 x হেডফোন" — কুরিয়ারের লোক বুঝে নেয় */
   itemDescription: string;
 
   /**

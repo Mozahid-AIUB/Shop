@@ -1,6 +1,6 @@
 ---
 name: ship-review
-description: Use before pushing this t-shirt platform to GitHub or closing out a phase — when changes are ready to commit, CI is about to run, or someone asks whether the code is production-ready, secure, or missing something a real e-commerce site would have.
+description: Use before pushing this e-commerce platform to GitHub or closing out a phase — when changes are ready to commit, CI is about to run, or someone asks whether the code is production-ready, secure, or missing something a real e-commerce site would have.
 ---
 
 # Ship Review
