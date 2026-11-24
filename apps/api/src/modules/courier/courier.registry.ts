@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Courier } from '@shop/shared';
 import type { CourierProvider } from './courier.provider';
 import { ManualProvider } from './providers/manual.provider';
+import { PathaoProvider } from './providers/pathao.provider';
 import { SteadfastProvider } from './providers/steadfast.provider';
 
 /**
@@ -23,10 +24,15 @@ import { SteadfastProvider } from './providers/steadfast.provider';
 export class CourierRegistry {
   private readonly providers: Map<Courier, CourierProvider>;
 
-  constructor(manual: ManualProvider, steadfast: SteadfastProvider) {
+  constructor(
+    manual: ManualProvider,
+    steadfast: SteadfastProvider,
+    pathao: PathaoProvider,
+  ) {
     this.providers = new Map<Courier, CourierProvider>([
       [manual.kind, manual],
       [steadfast.kind, steadfast],
+      [pathao.kind, pathao],
     ]);
   }
 

@@ -9,6 +9,7 @@ import type {
   TrackResult,
   WebhookUpdate,
 } from '../courier.provider';
+import { translateHttpError, unreachable } from '../http-errors';
 import { hmacMatches, headerValue } from '../webhook-guard';
 
 /**
@@ -362,18 +363,14 @@ export class SteadfastProvider implements CourierProvider {
 
       return {
         ok: false,
-        failure: {
-          ok: false,
-          message: 'Steadfast-এ পৌঁছানো গেল না — আবার চেষ্টা করুন',
-          retryable: true,
-        },
+        failure: unreachable('Steadfast'),
       };
     }
 
     const body: unknown = await response.json().catch(() => null);
 
     if (!response.ok) {
-      return { ok: false, failure: this.translateError(response.status, body) };
+      return { ok: false, failure: translateHttpError(response.status, body, 'Steadfast') };
     }
 
     /**
@@ -387,110 +384,10 @@ export class SteadfastProvider implements CourierProvider {
     const inner = this.readInnerStatus(body);
 
     if (inner !== null && inner >= 400) {
-      return { ok: false, failure: this.translateError(inner, body) };
+      return { ok: false, failure: translateHttpError(inner, body, 'Steadfast') };
     }
 
     return { ok: true, body };
-  }
-
-  /**
-   * তাদের HTTP কোড আমাদের বার্তায়।
-   *
-   * **`retryable` সঠিক হওয়া জরুরি।** ডকে লেখা: একই ঠিকানা থেকে
-   * ৫ মিনিটে ১০ বার ভুল key দিলে **৬০ মিনিট** আটকে যায়, ঠিক key
-   * দিলেও। তাই ৪০১-এ কখনো retry নয় — নইলে key ঠিক করার পরেও
-   * দোকান এক ঘণ্টা পার্সেল পাঠাতে পারত না।
-   */
-  private translateError(status: number, body: unknown): {
-    ok: false;
-    message: string;
-    retryable: boolean;
-  } {
-    if (status === 401) {
-      return {
-        ok: false,
-        message: 'Steadfast-এর API key ভুল বা বাতিল — প্যানেল থেকে নতুন key বসান',
-        retryable: false,
-      };
-    }
-
-    if (status === 403) {
-      return {
-        ok: false,
-        message: 'Steadfast অ্যাকাউন্ট নিষ্ক্রিয় বা KYC অসম্পূর্ণ — তাদের সাথে যোগাযোগ করুন',
-        retryable: false,
-      };
-    }
-
-    if (status === 422) {
-      return { ok: false, message: this.fieldErrors(body), retryable: false };
-    }
-
-    if (status === 429) {
-      return {
-        ok: false,
-        message: 'Steadfast-এ অনেক বেশি অনুরোধ গেছে — কিছুক্ষণ পর আবার চেষ্টা করুন',
-        retryable: true,
-      };
-    }
-
-    if (status >= 500) {
-      /**
-       * তাদের দোষ — retry করা যায়। ডকে লেখা: "Retry with the same
-       * invoice; duplicate invoices are refused, so a retry cannot
-       * double-book."
-       */
-      return {
-        ok: false,
-        message: 'Steadfast-এর সার্ভারে সমস্যা — আবার চেষ্টা করুন',
-        retryable: true,
-      };
-    }
-
-    return {
-      ok: false,
-      message: this.messageFrom(body) ?? `Steadfast ${status} দিয়েছে`,
-      retryable: false,
-    };
-  }
-
-  /**
-   * কোন মাঠ কী কারণে বাতিল হলো।
-   *
-   * মাঠের নাম রাখা হয় (`recipient_phone`), কারণ অ্যাডমিনকে জানতে
-   * হবে কোথায় ঠিক করতে হবে। শুধু "validation error" বললে সে
-   * অর্ডারের সব মাঠ হাতড়াত।
-   */
-  private fieldErrors(body: unknown): string {
-    if (typeof body !== 'object' || body === null) {
-      return 'Steadfast তথ্য নেয়নি';
-    }
-
-    const errors = (body as Record<string, unknown>)['errors'];
-
-    if (typeof errors !== 'object' || errors === null) {
-      return this.messageFrom(body) ?? 'Steadfast তথ্য নেয়নি';
-    }
-
-    const parts: string[] = [];
-
-    for (const [field, messages] of Object.entries(errors)) {
-      const first = Array.isArray(messages) ? messages[0] : messages;
-
-      parts.push(`${field}: ${String(first)}`);
-    }
-
-    return parts.length === 0 ? 'Steadfast তথ্য নেয়নি' : parts.join('; ');
-  }
-
-  private messageFrom(body: unknown): string | null {
-    if (typeof body !== 'object' || body === null) {
-      return null;
-    }
-
-    const message = (body as Record<string, unknown>)['message'];
-
-    return typeof message === 'string' ? message : null;
   }
 
   private readInnerStatus(body: unknown): number | null {

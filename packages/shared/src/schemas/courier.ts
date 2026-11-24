@@ -88,6 +88,19 @@ export const courierAccountInputSchema = z
      * ডেলিভারড দেখাত, আর COD-র টাকা না পেয়েই হিসাব মিলে যেত।
      */
     webhookSecret: z.string().trim().min(16, 'অন্তত ১৬ অক্ষর').max(200).nullable().default(null),
+    /**
+     * পার্সেলের ডিফল্ট ওজন, গ্রামে — পণ্যে ওজন লেখা না থাকলে এটা যায়।
+     *
+     * কুরিয়াররা ওজন **বাধ্যতামূলক** চায় (Pathao-তে ন্যূনতম ০.৫ কেজি),
+     * তাই কিছু একটা পাঠাতেই হয়। ৫০০ গ্রাম ডিফল্ট: Pathao-র ন্যূনতম,
+     * আর জামাকাপড়ে বাস্তবসম্মত। ভারী পণ্যের দোকান বাড়িয়ে নেবে।
+     */
+    defaultWeightGrams: z
+      .number()
+      .int('ওজন গ্রামে পূর্ণসংখ্যা হবে')
+      .min(1, 'ওজন অন্তত ১ গ্রাম')
+      .max(50_000, 'ওজন ৫০ কেজির বেশি নয়')
+      .default(500),
     isActive: z.boolean().default(false),
     isDefault: z.boolean().default(false),
     isSandbox: z.boolean().default(false),
@@ -111,6 +124,7 @@ export const courierAccountUpdateSchema = z.object({
   label: z.string().trim().min(1).max(60).optional(),
   credentials: credentialsSchema.nullable().optional(),
   webhookSecret: z.string().trim().min(16).max(200).nullable().optional(),
+  defaultWeightGrams: z.number().int().min(1).max(50_000).optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
   isSandbox: z.boolean().optional(),
@@ -166,6 +180,7 @@ export type CourierAccountView = {
   isActive: boolean;
   isDefault: boolean;
   isSandbox: boolean;
+  defaultWeightGrams: number;
   /** কোন মাঠ বসানো আছে → masked মান। অনুপস্থিত মাঠ এখানে থাকে না */
   credentialHints: Record<string, string>;
   /** যে মাঠগুলো এখনো বসানো হয়নি — প্যানেল লাল দেখাতে পারে */

@@ -52,6 +52,19 @@ export type ParcelRequest = {
   /** "2 x টি-শার্ট (L, কালো)" — কুরিয়ারের লোক বুঝে নেয় */
   itemDescription: string;
 
+  /**
+   * পুরো পার্সেলের ওজন, **গ্রামে**।
+   *
+   * কুরিয়াররা ওজন **বাধ্যতামূলক** চায় আর সেটা ধরে চার্জ করে, তাই
+   * ভুল ওজন মানে ভুল বিল। গ্রামে রাখা হয় কারণ RedX গ্রামে চায় আর
+   * Pathao কেজিতে — adapter নিজের একক অনুযায়ী ভাগ করে নেয়।
+   *
+   * পণ্যে ওজন লেখা না থাকলে কুরিয়ার সেটআপের ডিফল্ট ব্যবহার হয়, তাই
+   * এই মাঠ কখনো `null` হয় না — `0`-ও নয়, কারণ কুরিয়ার ০ ওজনে
+   * পার্সেল নেয় না।
+   */
+  weightGrams: number;
+
   note: string | null;
 };
 
@@ -117,6 +130,27 @@ export type ProviderContext = {
   credentials: CourierCredentials;
   /** sandbox হলে adapter টেস্ট URL ব্যবহার করবে */
   isSandbox: boolean;
+
+  /**
+   * জমানো OAuth টোকেন (এনক্রিপ্ট খোলা অবস্থায়), বা `null`।
+   *
+   * **কেন adapter নিজে DB-তে যায় না:** তাহলে প্রতিটা adapter-এ
+   * Prisma আর এনক্রিপশন ঢুকত, আর টেস্ট করতে DB লাগত। এখানে
+   * টোকেনটা দেওয়া-নেওয়ার কাজ service-এর, আর adapter শুধু বলে
+   * "এটা রাখো"।
+   *
+   * static key-ওয়ালা কুরিয়ারে (Steadfast) অব্যবহৃত।
+   */
+  oauthToken?: string | null;
+
+  /**
+   * নতুন টোকেন জমা রাখা।
+   *
+   * adapter এটা ডাকে টোকেন ইস্যু বা refresh করার পর। service
+   * এনক্রিপ্ট করে DB-তে লেখে, তাই সার্ভার রিস্টার্ট হলেও টোকেন
+   * থাকে — আর একাধিক সার্ভার চালালে সবাই একটাই টোকেন ব্যবহার করে।
+   */
+  saveOauthToken?: (token: string) => Promise<void>;
 };
 
 export interface CourierProvider {

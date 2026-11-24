@@ -32,6 +32,7 @@ describe('SteadfastProvider', () => {
     codAmountPaisa: 106_000,
     itemCount: 2,
     itemDescription: '2 x T-Shirt (L, Black)',
+    weightGrams: 400,
     note: null,
   };
 
@@ -250,6 +251,31 @@ describe('SteadfastProvider', () => {
     });
   });
 
+  describe('the parcel weight', () => {
+    /**
+     * **Steadfast ওজন চায় না** — তাদের ডকে `parcel_weight` মাঠ নেই।
+     *
+     * তাই পাঠানো হয় না। অপ্রয়োজনীয় মাঠ পাঠালে তারা উপেক্ষা করত,
+     * কিন্তু আমরা ভাবতাম ওজন ধরে চার্জ হচ্ছে — অথচ তারা নিজেরাই
+     * ওজন মাপে। পরে বিল না মিললে কারণ খোঁজা কঠিন হতো।
+     *
+     * ওজনটা Pathao আর RedX-এর জন্য রাখা, যারা বাধ্যতামূলক চায়।
+     */
+    it('is not sent to Steadfast, which does not ask for it', async () => {
+      const { calls } = stubFetch(200, {
+        status: 200,
+        consignment: { consignment_id: 1, tracking_code: 'T', status: 'in_review' },
+      });
+
+      await provider.createParcel(parcel, context);
+
+      const body = JSON.parse(String(calls[0]?.init.body)) as Record<string, unknown>;
+
+      expect(body['parcel_weight']).toBeUndefined();
+      expect(body['weight']).toBeUndefined();
+    });
+  });
+
   describe('when Steadfast says no', () => {
     /**
      * ৪০১ = key ভুল। **`retryable: false`**, কারণ আবার চেষ্টা করলে
@@ -266,7 +292,9 @@ describe('SteadfastProvider', () => {
 
       if (!result.ok) {
         expect(result.retryable).toBe(false);
-        expect(result.message).toContain('key');
+        // বার্তায় কুরিয়ারের নাম থাকতে হবে — একাধিক কুরিয়ার চালালে
+        // অ্যাডমিন নইলে বুঝত না কোনটায় সমস্যা
+        expect(result.message).toContain('Steadfast');
       }
     });
 

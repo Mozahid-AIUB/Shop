@@ -57,12 +57,37 @@ export const variantOptionSchema = z.object({
   value: z.string().trim().min(1, 'option-এর মান দিন').max(80),
 });
 
+/**
+ * ওজন **গ্রামে, পূর্ণসংখ্যায়** — টাকার মতোই নীতি।
+ *
+ * **কেন গ্রাম, কেজি নয়:** RedX গ্রামে চায়, Pathao কেজিতে (float)।
+ * গ্রামে রাখলে integer-এ কাজ চলে আর adapter নিজের একক অনুযায়ী
+ * ভাগ করে নেয়। কেজিতে float রাখলে `0.1 + 0.2` সমস্যা ফিরে আসত,
+ * আর কুরিয়ার ওজন ধরে চার্জ করে — ভুল ওজন মানে ভুল বিল।
+ *
+ * `null` = লেখা হয়নি, তখন কুরিয়ার সেটআপের ডিফল্ট ওজন ব্যবহার হয়।
+ * `0` রাখা যায় না: ওটা "ওজনহীন পণ্য" বোঝাত, যা অসম্ভব, আর
+ * কুরিয়ার ০ ওজনে পার্সেল নেয় না।
+ */
+const weightGramsSchema = z
+  .number()
+  .int('ওজন গ্রামে পূর্ণসংখ্যা হবে')
+  .min(1, 'ওজন অন্তত ১ গ্রাম')
+  .max(50_000, 'ওজন ৫০ কেজির বেশি নয়');
+
 export const createVariantSchema = z
   .object({
     sku: z.string().trim().min(1, 'SKU দিন').max(60),
     pricePaisa: paisaSchema,
     comparePricePaisa: paisaSchema.nullable().optional(),
     stock: stockSchema.default(0),
+    /**
+     * কুরিয়ারে পাঠানোর জন্য (Phase 10)।
+     *
+     * ঐচ্ছিক, কারণ পুরোনো পণ্যগুলোতে এটা নেই আর সব পণ্যে হাতে বসানো
+     * বড় কাজ। না থাকলে কুরিয়ার সেটআপের ডিফল্ট ওজন যায়।
+     */
+    weightGrams: weightGramsSchema.nullable().optional(),
     isActive: z.boolean().default(true),
     options: z.array(variantOptionSchema).max(10, 'সর্বোচ্চ ১০টা option').default([]),
   })

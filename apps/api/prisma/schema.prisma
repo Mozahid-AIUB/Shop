@@ -129,6 +129,15 @@ model ProductVariant {
   /// কাটার আগের দাম, ছাড় দেখাতে
   comparePricePaisa Int?
   stock             Int     @default(0)
+  /// কুরিয়ারে পাঠানোর ওজন, **গ্রামে** (Phase 10)।
+  ///
+  /// গ্রাম, কেজি নয় — RedX গ্রামে চায়, Pathao কেজিতে। integer-এ
+  /// রাখলে float-এর ভাঙা হিসাব এড়ানো যায়, আর adapter নিজের একক
+  /// অনুযায়ী ভাগ করে নেয়। কুরিয়ার ওজন ধরে চার্জ করে, তাই ভুল ওজন
+  /// মানে ভুল বিল।
+  ///
+  /// `null` = লেখা হয়নি; তখন কুরিয়ার সেটআপের ডিফল্ট ওজন যায়।
+  weightGrams       Int?
   isActive          Boolean @default(true)
 
   product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -742,6 +751,16 @@ model CourierAccount {
   /// sandbox/test mode — আসল পার্সেল না পাঠিয়ে পরীক্ষা করা যায়
   isSandbox Boolean @default(false)
 
+  /// পার্সেলের ডিফল্ট ওজন, **গ্রামে**।
+  ///
+  /// পণ্যে ওজন লেখা না থাকলে এটা যায়। কুরিয়াররা ওজন **বাধ্যতামূলক**
+  /// চায় (Pathao-তে ন্যূনতম ০.৫ কেজি), তাই কিছু একটা পাঠাতেই হয় —
+  /// আর ০ পাঠালে তারা পার্সেলই নিত না।
+  ///
+  /// ডিফল্ট ৫০০ গ্রাম: Pathao-র ন্যূনতম, আর টি-শার্ট/জামার জন্য
+  /// বাস্তবসম্মত। ভারী পণ্য বিক্রি করলে অ্যাডমিন বাড়িয়ে নেবে।
+  defaultWeightGrams Int @default(500)
+
   /**
    * webhook যাচাইয়ের গোপন মান, **এনক্রিপ্ট করা**।
    *
@@ -749,6 +768,21 @@ model CourierAccount {
    * ডেলিভারড দেখাত, আর COD-র টাকা না পেয়েই হিসাব মিলে যেত।
    */
   webhookSecret String?
+  /**
+   * OAuth টোকেন, **এনক্রিপ্ট করা JSON** — Pathao-র মতো কুরিয়ারের জন্য।
+   *
+   * Pathao প্রতিটা কলে static key নেয় না; আগে টোকেন ইস্যু করতে হয়,
+   * আর সেটার মেয়াদ ৫ দিন। প্রতিবার নতুন টোকেন চাইলে তাদের rate
+   * limit-এ পড়তাম, আর মেমরিতে রাখলে সার্ভার রিস্টার্টেই হারাত —
+   * একাধিক সার্ভার চালালে প্রত্যেকে আলাদা টোকেন নিত।
+   *
+   * আকার: `{ accessToken, refreshToken, expiresAt }`।
+   *
+   * **key-র মতোই এনক্রিপ্টেড**, কারণ টোকেন হাতে পেলে key-র মতোই
+   * কাজ করা যায় — মেয়াদ শেষ হওয়া পর্যন্ত।
+   */
+  oauthToken String?
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
