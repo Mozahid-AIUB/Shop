@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import type { CourierAccount, Prisma } from '@prisma/client';
@@ -14,6 +15,7 @@ import {
 } from '@shop/shared';
 import { SecretBox } from '../../common/secret-box';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { ProviderContext } from './courier.provider';
 
 /**
  * কুরিয়ারের সেটআপ — **সব অ্যাডমিন প্যানেল থেকে**।
@@ -31,6 +33,7 @@ import { PrismaService } from '../../prisma/prisma.service';
  */
 @Injectable()
 export class CourierAccountService {
+  private readonly logger = new Logger(CourierAccountService.name);
   private readonly box: SecretBox;
 
   constructor(private readonly prisma: PrismaService) {
@@ -71,6 +74,7 @@ export class CourierAccountService {
           isActive: input.isActive,
           isDefault: input.isDefault,
           isSandbox: input.isSandbox,
+          defaultWeightGrams: input.defaultWeightGrams,
         },
       });
 
@@ -130,6 +134,7 @@ export class CourierAccountService {
           isActive: input.isActive,
           isDefault: input.isDefault,
           isSandbox: input.isSandbox,
+          defaultWeightGrams: input.defaultWeightGrams,
         },
       });
 
@@ -208,6 +213,51 @@ export class CourierAccountService {
     this.assertReadyToActivate(account.kind, credentials);
 
     return { account, credentials: credentials ?? {} };
+  }
+
+  /**
+   * adapter-কে দেওয়ার context — credential আর OAuth টোকেন খোলা অবস্থায়।
+   *
+   * **কেন এটা এখানে, adapter-এ নয়:** তাহলে প্রতিটা adapter-এ
+   * Prisma আর এনক্রিপশন ঢুকত, আর ওগুলো টেস্ট করতে DB লাগত।
+   * এনক্রিপশন এক জায়গায় থাকলে ভুল করার জায়গাও একটাই।
+   *
+   * `saveOauthToken` adapter ডাকে টোকেন ইস্যু বা refresh করার পর।
+   * টোকেনটা **এনক্রিপ্ট করে** জমা হয়, কারণ হাতে পেলে সেটা key-র
+   * মতোই কাজ করে — মেয়াদ শেষ হওয়া পর্যন্ত।
+   */
+  buildProviderContext(
+    account: CourierAccount,
+    credentials: Record<string, string>,
+  ): ProviderContext {
+    return {
+      credentials,
+      isSandbox: account.isSandbox,
+      oauthToken: account.oauthToken === null ? null : this.openToken(account.oauthToken),
+      saveOauthToken: async (token: string): Promise<void> => {
+        await this.prisma.courierAccount.update({
+          where: { id: account.id },
+          data: { oauthToken: this.box.seal(token) },
+        });
+      },
+    };
+  }
+
+  /**
+   * জমানো টোকেন খোলা।
+   *
+   * **খুলতে না পারলে `null`, throw নয়** — এনক্রিপশনের চাবি বদলালে
+   * বা row হাতে বদলালে এটা ঘটতে পারে। throw করলে দোকান পার্সেলই
+   * পাঠাতে পারত না, অথচ সমাধান সহজ: adapter নতুন টোকেন নিয়ে নেবে।
+   */
+  private openToken(sealed: string): string | null {
+    try {
+      return this.box.open(sealed);
+    } catch {
+      this.logger.warn('Stored courier OAuth token could not be read — a fresh one will be issued');
+
+      return null;
+    }
   }
 
   /** webhook যাচাইয়ের জন্য — secret খোলা অবস্থায়। */
@@ -330,6 +380,7 @@ export class CourierAccountService {
       isActive: account.isActive,
       isDefault: account.isDefault,
       isSandbox: account.isSandbox,
+      defaultWeightGrams: account.defaultWeightGrams,
       credentialHints,
       missingFields: required.filter((field) => (credentials[field] ?? '') === ''),
       hasWebhookSecret: account.webhookSecret !== null,

@@ -526,6 +526,122 @@ describe('Courier', () => {
     });
   });
 
+  describe('the parcel weight', () => {
+    /**
+     * **কুরিয়াররা ওজন বাধ্যতামূলক চায় আর সেটা ধরে চার্জ করে**, তাই
+     * ভুল ওজন মানে ভুল বিল।
+     *
+     * পণ্যে ওজন লেখা থাকলে সেটাই যায়, না থাকলে কুরিয়ার সেটআপের
+     * ডিফল্ট। এখানে ডিফল্টের পথটা যাচাই হচ্ছে, কারণ এই suite-এর
+     * পণ্যে ওজন বসানো হয়নি — ঠিক যেমন পুরোনো পণ্যগুলোতে থাকবে না।
+     */
+    it('falls back to the courier default when a product has no weight', async () => {
+      const variant = await prisma.productVariant.findUniqueOrThrow({
+        where: { id: variantId },
+        select: { weightGrams: true },
+      });
+
+      expect(variant.weightGrams).toBeNull();
+
+      const manual = await prisma.courierAccount.findUniqueOrThrow({
+        where: { kind: 'MANUAL' },
+        select: { defaultWeightGrams: true },
+      });
+
+      // ডিফল্ট ৫০০ গ্রাম — Pathao-র ন্যূনতম, আর জামাকাপড়ে বাস্তবসম্মত
+      expect(manual.defaultWeightGrams).toBe(500);
+    });
+
+    /** পণ্যে ওজন বসানো যায় — ভারী পণ্যে এটা লাগবেই। */
+    it('accepts a weight on a product variant', async () => {
+      const category = await request(app.getHttpServer())
+        .post('/admin/categories')
+        .set(authed(adminToken))
+        .send({ name: 'Heavy', slug: `heavy-${stamp}` })
+        .expect(201);
+
+      const created = await request(app.getHttpServer())
+        .post('/admin/products')
+        .set(authed(adminToken))
+        .send({
+          name: 'Heavy Thing',
+          slug: `heavy-thing-${stamp}`,
+          categoryId: category.body.id,
+          isPublished: true,
+          variants: [
+            { sku: `SKU-HV-${stamp}`, pricePaisa: 50_000, stock: 5, weightGrams: 2_500 },
+          ],
+        })
+        .expect(201);
+
+      const saved = await prisma.productVariant.findUniqueOrThrow({
+        where: { id: created.body.variants[0].id },
+        select: { weightGrams: true },
+      });
+
+      expect(saved.weightGrams).toBe(2_500);
+
+      await prisma.product.deleteMany({ where: { slug: `heavy-thing-${stamp}` } });
+      await prisma.category.deleteMany({ where: { slug: `heavy-${stamp}` } });
+    });
+
+    /**
+     * ০ গ্রাম নেওয়া হয় না।
+     *
+     * ওটা "ওজনহীন পণ্য" বোঝাত, যা অসম্ভব — আর কুরিয়ার ০ ওজনে
+     * পার্সেল নেয় না, তাই পাঠানোর মুহূর্তে ব্যর্থ হতো।
+     */
+    it('refuses a zero weight', async () => {
+      const category = await request(app.getHttpServer())
+        .post('/admin/categories')
+        .set(authed(adminToken))
+        .send({ name: 'Zero', slug: `zero-${stamp}` })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/admin/products')
+        .set(authed(adminToken))
+        .send({
+          name: 'Weightless',
+          slug: `weightless-${stamp}`,
+          categoryId: category.body.id,
+          variants: [{ sku: `SKU-ZR-${stamp}`, pricePaisa: 1_000, stock: 1, weightGrams: 0 }],
+        })
+        .expect(400);
+
+      await prisma.category.deleteMany({ where: { slug: `zero-${stamp}` } });
+    });
+
+    /** অ্যাডমিন ডিফল্ট ওজন বদলাতে পারে — ভারী পণ্যের দোকানে দরকার। */
+    it('lets the admin change the courier default weight', async () => {
+      const accounts = await request(app.getHttpServer())
+        .get('/admin/couriers')
+        .set(authed(adminToken))
+        .expect(200);
+
+      const manual = accounts.body.find((a: { kind: string }) => a.kind === 'MANUAL');
+
+      await request(app.getHttpServer())
+        .patch(`/admin/couriers/${manual.id}`)
+        .set(authed(adminToken))
+        .send({ defaultWeightGrams: 1_200 })
+        .expect(200);
+
+      const after = await prisma.courierAccount.findUniqueOrThrow({
+        where: { kind: 'MANUAL' },
+        select: { defaultWeightGrams: true },
+      });
+
+      expect(after.defaultWeightGrams).toBe(1_200);
+
+      // পরের টেস্টগুলোর জন্য ফিরিয়ে দেওয়া
+      await prisma.courierAccount.update({
+        where: { kind: 'MANUAL' },
+        data: { defaultWeightGrams: 500 },
+      });
+    });
+  });
+
   describe('updating a parcel by hand', () => {
     /** `MANUAL` কুরিয়ারে এটাই একমাত্র পথ — webhook পাঠানোর কেউ নেই। */
     it('lets the admin move a manual parcel forward', async () => {

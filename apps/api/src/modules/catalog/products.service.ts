@@ -151,6 +151,8 @@ export class ProductsService {
               pricePaisa: variant.pricePaisa,
               comparePricePaisa: variant.comparePricePaisa ?? null,
               stock: variant.stock,
+              // কুরিয়ারে পাঠানোর ওজন (Phase 10) — না দিলে কুরিয়ার সেটআপের ডিফল্ট
+              weightGrams: variant.weightGrams ?? null,
               isActive: variant.isActive,
               options: { create: variant.options },
             })),

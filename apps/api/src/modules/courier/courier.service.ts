@@ -44,7 +44,12 @@ type DispatchableOrder = {
   shipLine2: string | null;
   shipCity: string;
   shipDistrict: string;
-  items: { productName: string; optionsText: string | null; quantity: number }[];
+  items: {
+    productName: string;
+    optionsText: string | null;
+    quantity: number;
+    variant: { weightGrams: number | null } | null;
+  }[];
   shipments: { id: string; status: ShipmentStatus }[];
 };
 
@@ -120,8 +125,12 @@ export class CourierService {
     });
 
     const result = await provider.createParcel(
-      this.toParcelRequest(order, codAmountPaisa, input.note ?? null),
-      { credentials, isSandbox: account.isSandbox },
+      this.toParcelRequest(order, {
+        codAmountPaisa,
+        note: input.note ?? null,
+        defaultWeightGrams: account.defaultWeightGrams,
+      }),
+      this.accounts.buildProviderContext(account, credentials),
     );
 
     if (!result.ok) {
@@ -192,7 +201,21 @@ export class CourierService {
         shipLine2: true,
         shipCity: true,
         shipDistrict: true,
-        items: { select: { productName: true, optionsText: true, quantity: true } },
+        items: {
+          select: {
+            productName: true,
+            optionsText: true,
+            quantity: true,
+            /**
+             * ভ্যারিয়েন্টের ওজন — কুরিয়ারে পাঠানোর জন্য।
+             *
+             * `variant` `null` হতে পারে না (অর্ডারে relation বাধ্যতামূলক),
+             * কিন্তু `weightGrams` `null` হতে পারে — তখন কুরিয়ার
+             * সেটআপের ডিফল্ট ব্যবহার হয়।
+             */
+            variant: { select: { weightGrams: true } },
+          },
+        },
         shipments: { select: { id: true, status: true } },
       },
     });
@@ -242,18 +265,29 @@ export class CourierService {
    */
   private toParcelRequest(
     order: DispatchableOrder,
-    codAmountPaisa: number,
-    note: string | null,
+    options: { codAmountPaisa: number; note: string | null; defaultWeightGrams: number },
   ): ParcelRequest {
     return {
       orderNumber: order.orderNumber,
+      /**
+       * পুনঃপ্রেরণে আলাদা reference।
+       *
+       * কুরিয়াররা একই invoice দুবার নেয় না। আগের পার্সেলগুলো গোনা
+       * হয় (ফেরত আসা সহ), তাই দ্বিতীয়বারে `-R2` যায়। না করলে
+       * ফেরত আসা পণ্য আর কখনো পাঠানো যেত না।
+       */
+      parcelReference:
+        order.shipments.length === 0
+          ? order.orderNumber
+          : `${order.orderNumber}-R${order.shipments.length + 1}`,
       recipientName: order.shipFullName,
       recipientPhone: order.shipPhone,
       recipientAddress: [order.shipLine1, order.shipLine2].filter(Boolean).join(', '),
       recipientCity: order.shipCity,
       recipientDistrict: order.shipDistrict,
-      codAmountPaisa,
+      codAmountPaisa: options.codAmountPaisa,
       itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
+      weightGrams: this.totalWeightGrams(order.items, options.defaultWeightGrams),
       itemDescription: order.items
         .map((item) =>
           item.optionsText === null
@@ -261,8 +295,38 @@ export class CourierService {
             : `${item.quantity} x ${item.productName} (${item.optionsText})`,
         )
         .join(', '),
-      note,
+      note: options.note,
     };
+  }
+
+  /**
+   * পুরো পার্সেলের ওজন।
+   *
+   * প্রতিটা আইটেমের ওজন × পরিমাণ, যোগ করে। যে আইটেমে ওজন লেখা নেই
+   * তার জায়গায় কুরিয়ার সেটআপের ডিফল্ট — কুরিয়াররা ওজন বাধ্যতামূলক
+   * চায়, তাই কিছু একটা পাঠাতেই হয়।
+   *
+   * **প্যাকেটের ওজন ধরা হয় না**, ইচ্ছাকৃতভাবে। পলিব্যাগ বা কার্টনের
+   * ওজন দোকানভেদে আলাদা, আর আন্দাজ করে যোগ করলে অ্যাডমিন বুঝত না
+   * সংখ্যাটা কোথা থেকে এলো। ডিফল্ট ওজন অ্যাডমিন নিজেই বসায় — চাইলে
+   * প্যাকেটের ওজন ধরেই বসাবে।
+   */
+  private totalWeightGrams(
+    items: DispatchableOrder['items'],
+    defaultWeightGrams: number,
+  ): number {
+    const total = items.reduce(
+      (sum, item) => sum + (item.variant?.weightGrams ?? defaultWeightGrams) * item.quantity,
+      0,
+    );
+
+    /**
+     * কখনো `0` যায় না — কুরিয়ার ০ ওজনে পার্সেল নেয় না।
+     *
+     * অর্ডারে আইটেম থাকলে এটা ঘটে না (চেকআউট খালি কার্ট আটকায়),
+     * কিন্তু ডিফল্ট কোনোভাবে `0` হয়ে গেলে এটাই শেষ রক্ষা।
+     */
+    return Math.max(total, 1);
   }
 
   /**

@@ -125,18 +125,24 @@
 - [x] 10.7 **টেস্ট:** key না থাকলে সাইট চলে (`MANUAL`-এ)
 - [x] 10.8 **টেস্ট:** key কখনো response-এ ফেরে না, DB-তে এনক্রিপ্টেড
 
-**বাকি — চারটা adapter, প্রত্যেকের merchant ডক লাগবে:**
+**Adapter — প্রত্যেকের merchant ডক লাগে:**
 
-- [ ] 10.9 Steadfast adapter — **merchant dashboard-এর ডক + sandbox key**
-- [ ] 10.10 Pathao adapter — **ডক + key** (OAuth, টোকেনের মেয়াদ আছে)
-- [ ] 10.11 RedX adapter — **ডক + key**
-- [ ] 10.12 Carrybee adapter — **ডক + key**
+- [x] 10.9 Steadfast adapter — **মালিকের merchant API guide ধরে লেখা**
+- [x] 10.10 Pathao adapter — **তাদের developer documentation ধরে** (OAuth, টোকেন DB-তে এনক্রিপ্টেড)
+- [x] 10.11 RedX adapter — **তাদের OpenAPI documentation ধরে** (এরিয়া lookup + query-token webhook + বাতিল)
+- [ ] ~~10.12 Carrybee adapter~~ — **মালিকের সিদ্ধান্তে বাদ**, ডকও পাওয়া যায়নি
+- [x] 10.13 পণ্যে ওজনের ঘর (গ্রামে) + কুরিয়ার সেটআপে ডিফল্ট ওজন
 
-> চারটার কারোরই আসল API ডকুমেন্টেশন পাবলিক নয় — শুধু third-party
-> wrapper পাওয়া যায়, আর তাদের মধ্যেই অমিল। অনুমান করে লিখলে
-> চারটাই ভুল হতো, আর key বসানোর পর ব্যর্থ হতো — তখন বোঝাই যেত না
-> ভুলটা key-তে না কোডে। মাঠগুলো `COURIER_CREDENTIAL_FIELDS`-এ
-> আগেই লেখা, registry-তে একটা লাইন যোগ করলেই নতুন adapter বসে।
+> Steadfast-এর ডক মালিক দিয়েছে, তাই ওটা লেখা হয়ে গেছে — আর ডক পড়েই
+> তিনটা জিনিস ধরা পড়ল যা অনুমান করলে ভুল হতো: `cod_amount` টাকায়
+> (paisa নয়, নইলে ১০০ গুণ), `delivered_approval_pending` ≠ delivered
+> (রাইডারের দাবি, নিশ্চয়তা নয়), আর একই invoice দুবার নেয় না (ফলে
+> ফেরত আসা পণ্য আর পাঠানোই যেত না — আমাদের নিজের বাগ)।
+>
+> বাকি তিনটার ডকও merchant dashboard-এ আছে। Pathao আর RedX-এর ডক
+> পাওয়া গেছে; Carrybee-র এখনো নয়। মাঠগুলো
+> `COURIER_CREDENTIAL_FIELDS`-এ লেখা, registry-তে এক লাইন যোগ করলেই
+> নতুন adapter বসে।
 
 ---
 
