@@ -218,13 +218,28 @@ enum PaymentRecordStatus {
 }
 
 /// ইউজারপ্রতি একটাই কার্ট — লগইন করে অন্য ডিভাইসে গেলেও থাকে।
+/// কার্ট — লগইন করা ইউজারের, **নয়তো** গেস্টের।
+///
+/// ঠিক একটা মালিক থাকে: হয় `userId`, নয় `guestToken` — দুটোই নয়,
+/// কোনোটাই নয় এমনও নয়। service সেটা নিশ্চিত করে।
+///
+/// **কেন গেস্ট cart দরকার:** বাংলাদেশে অনেক ক্রেতা অ্যাকাউন্ট খুলতে
+/// চায় না। লগইন বাধ্যতামূলক রাখলে কিনতে আসা ক্রেতাও ফিরে যায়।
 model Cart {
-  id        String     @id @default(cuid())
-  userId    String     @unique
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String  @id @default(cuid())
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// গেস্টের পরিচয় — **সার্ভার তৈরি করে**, ক্লায়েন্ট নয়।
+  /// ক্লায়েন্টকে বানাতে দিলে কেউ `guest-1`, `guest-2` পাঠিয়ে অন্যের
+  /// কার্ট খুলে ফেলত। তাই অনুমান-অসাধ্য random মান।
+  guestToken String? @unique
+
   items     CartItem[]
   updatedAt DateTime   @updatedAt
 
+  /// পুরোনো গেস্ট cart পরিষ্কার করার জন্য (cron, পরে)
+  @@index([guestToken, updatedAt])
   @@map("carts")
 }
 
@@ -271,7 +286,13 @@ model Order {
   id            String        @id @default(cuid())
   /// ORD-2026-1123-018 — পড়া ও ফোনে বলা সহজ
   orderNumber   String        @unique
-  userId        String
+  /// `null` মানে গেস্ট অর্ডার — অ্যাকাউন্ট ছাড়া দেওয়া।
+  ///
+  /// **সতর্কতা:** এটা nullable হওয়ায় `where: { userId }` আর
+  /// ownership যাচাইয়ের জন্য যথেষ্ট নয় — `undefined` পাঠালে Prisma
+  /// শর্তটাই বাদ দেয় আর সব অর্ডার ফেরত আসে। তাই service-এ
+  /// `userId` সবসময় স্পষ্ট `string` হিসেবে পাঠানো হয়।
+  userId        String?
   status        OrderStatus   @default(PENDING)
   paymentStatus PaymentStatus @default(UNPAID)
 
@@ -301,7 +322,7 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user             User                 @relation(fields: [userId], references: [id])
+  user             User?                @relation(fields: [userId], references: [id])
   address          Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
   items            OrderItem[]
   history          OrderStatusHistory[]
