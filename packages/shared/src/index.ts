@@ -17,4 +17,5 @@ export * from './schemas/order';
 export * from './schemas/payment';
 export * from './schemas/production';
 export * from './schemas/report';
+export * from './schemas/search';
 export * from './schemas/shipping';

@@ -19,11 +19,12 @@
 | 13 | Hardening (rate limit, helmet, log) | ✅ শেষ (backend) | `13-hardening.md` |
 | 14 | Shipping Zones (ডেলিভারি চার্জ) | ✅ শেষ (backend) | `14-commerce-essentials.md` |
 | 15 | Coupon + Campaign | ✅ শেষ (backend) | `14-commerce-essentials.md` |
+| 16 | Product Search | ✅ শেষ (backend) | `14-commerce-essentials.md` |
 | 18 | Guest Checkout | ✅ শেষ (backend) | `18-guest-checkout.md` |
-| 16, 17, 19-22 | Search, Review, Wishlist, Return, CMS, SEO | ⬜ বাকি | `14-commerce-essentials.md` |
+| 17, 19-22 | Review, Wishlist, Return, CMS, SEO | ⬜ বাকি | `14-commerce-essentials.md` |
 
-**এখন কোথায়:** Phase 02-07, 09, 10, 11, 13, 14, 15, 18 — সব `main`-এ merge ও push।
-বাকি Phase 16, 17, 19-22 (e-commerce-র বাদ পড়া মডিউলগুলো)।
+**এখন কোথায়:** Phase 02-07, 09, 10, 11, 13, 14, 15, 16, 18 — সব `main`-এ merge ও push।
+বাকি Phase 17, 19-22 (e-commerce-র বাদ পড়া মডিউলগুলো)।
 
 Phase 11 (Fraud Guard) শেষ — COD ঝুঁকির স্কোর checkout-এ, কিন্তু
 **কখনো অর্ডার আটকায় না** (সিদ্ধান্ত: আসল ক্রেতা হারানোর ক্ষতি অদৃশ্য
@@ -101,6 +102,39 @@ CJS আর সে `require('@testing-library/dom')` করে, কিন্ত�
 package-এর `module` মাঠ দেখে **ESM** build ধরিয়ে দিত, যার namespace
 object-এ named export গুলো CJS-র মতো বসে না। `vitest.config.mts`-এ
 CJS build-টা alias করে দেখিয়ে দেওয়া হয়েছে।
+
+Phase 16 (সার্চ) শেষ — `GET /products/search?q=`।
+
+**প্ল্যানে `tsvector` লেখা ছিল, সেটা বাদ দিতে হয়েছে — বাংলায় কাজ
+করে না।** Postgres-এর full-text parser "শব্দ" কী সেটা OS-এর ctype
+থেকে ঠিক করে; ctype UTF-8 না হলে (Windows-এ ডিফল্ট) প্রতিটা বাংলা
+অক্ষর **blank** ধরা হয়। যাচাই করে দেখা:
+`to_tsvector('simple','নীল শার্ট')` → ফাঁকা, আর
+`ts_debug` বাংলা অংশকে `blank` বলে। `pg_trgm`-ও একই:
+`show_trgm('শার্ট')` → `{}`। অর্থাৎ GIN index বানালেও সেটা
+বাংলা পণ্যের জন্য **সম্পূর্ণ ফাঁকা** থাকত আর সার্চ চুপচাপ কিছুই
+ফেরাত না।
+
+তাই **ILIKE**, প্রাসঙ্গিকতার ক্রমসহ: নাম-দিয়ে-শুরু > নামে আছে >
+ক্যাটাগরির নামে > বিবরণে। ক্রমটা SQL-এর একটা `CASE`-এ, কারণ Prisma
+"কোথায় মিলল সেটা ধরে স্কোর" প্রকাশ করতে পারে না। খালি ফলাফলে
+ক্যাটাগরির সাজেশন যায় — "কিছু পাওয়া যায়নি" বললে ক্রেতা চলে যায়।
+
+**সাথে `GET /products`-এর তিনটা আসল bug সারানো হয়েছে:**
+
+১. `sort=price_asc` **দাম নয়, variant-এর সংখ্যা** ধরে সাজাত
+(`variants: { _count: 'asc' }`)। ক্রেতা "কম দাম আগে" চেপে এলোমেলো
+ক্রম পেত — সরাসরি বিক্রি হারানোর মতো bug। ঠিক করতে ক্রমটা SQL-এ
+নিতে হয়েছে, কারণ ক্রেতা যে দাম দেখে সেটা সম্পর্কিত টেবিলের
+`MIN(pricePaisa)`, আর Prisma-র `orderBy` সেটা পারে না।
+
+২. `search=` ক্যাটাগরির নামে খুঁজত না।
+
+৩. **`search=%` পুরো ক্যাটালগ ফেরাত।** Prisma-র `contains` ভেতরে
+`ILIKE ('%' || $1 || '%')` বানায় আর মানটা escape করে না — query
+log দেখে যাচাই করা। এখন `escapeLikePattern` দিয়ে `%`, `_` আর `\`
+escape হয়। এটা SQL injection নয় (সেটা parameter ঠেকায়), এটা
+**wildcard injection** — আলাদা সমস্যা, আর parameter দিয়ে ঠেকে না।
 
 Phase 18 (Guest Checkout) শেষ — **অ্যাকাউন্ট ছাড়া কেনা যায়**।
 অর্ডার অ্যাডমিন প্যানেলে সদস্যের অর্ডারের মতোই দেখায় (নাম-ফোন

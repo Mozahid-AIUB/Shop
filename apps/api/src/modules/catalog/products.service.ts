@@ -4,11 +4,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import type {
-  CreateProductInput,
-  ProductListQuery,
-  UpdateProductInput,
-  UpdateStockInput,
+import {
+  escapeLikePattern,
+  type CreateProductInput,
+  type ProductListQuery,
+  type UpdateProductInput,
+  type UpdateStockInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -75,33 +76,68 @@ export class ProductsService {
    * আলাদা `count()` query লাগে না।
    */
   async list(query: ProductListQuery): Promise<ProductListResult> {
-    const where = this.buildListWhere(query);
-
-    const rows = await this.prisma.product.findMany({
-      where,
-      select: LIST_SELECT,
-      orderBy: this.buildListOrder(query.sort),
-      take: query.limit + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    });
+    const rows =
+      query.sort === 'newest'
+        ? await this.listByNewest(query)
+        : await this.listByPrice(query);
 
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;
 
     return {
-      items: page.map((row) => ({
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        category: row.category,
-        image: row.images[0] ?? null,
-        // তালিকায় "৳৪৫০ থেকে" দেখাতে সবচেয়ে কম দামটাই যথেষ্ট
-        fromPricePaisa: row.variants[0]?.pricePaisa ?? null,
-        comparePricePaisa: row.variants[0]?.comparePricePaisa ?? null,
-        inStock: row.variants.some((variant) => variant.stock > 0),
-      })),
+      items: page.map((row) => this.toCard(row)),
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
+  }
+
+  /** নতুন পণ্য আগে — Prisma নিজেই পারে, cursor-ও `id` ধরে চলে। */
+  private listByNewest(query: ProductListQuery): Promise<ProductCardRow[]> {
+    return this.prisma.product.findMany({
+      where: this.buildListWhere(query),
+      select: LIST_SELECT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: query.limit + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    });
+  }
+
+  /**
+   * দামে সাজানো।
+   *
+   * **কেন দুই ধাপ:** ক্রেতা যে দাম দেখে সেটা পণ্যের সবচেয়ে সস্তা
+   * সক্রিয় variant-এর দাম, অর্থাৎ `MIN(pricePaisa)` — একটা সম্পর্কিত
+   * টেবিলের সমষ্টি। Prisma-র `orderBy` এটা প্রকাশ করতে পারে না; আগে
+   * এখানে `variants: { _count: 'asc' }` লেখা ছিল, যেটা **দাম নয়,
+   * variant-এর সংখ্যা** ধরে সাজাত। ফলে "কম দাম আগে" চাপলে ক্রেতা
+   * এলোমেলো ক্রম পেত।
+   *
+   * তাই ক্রমটা SQL-এ বের করা হয়, আর সাজানো `id` ধরে Prisma দিয়ে
+   * বাকি তথ্য আনা হয় — এক জায়গায় ক্রম, আরেক জায়গায় তথ্য, দুটোই
+   * নিজের কাজে সেরা।
+   *
+   * `cursor`-ও তাই `id` ধরে কাজ করে না; আগের পাতার শেষ পণ্যের দাম
+   * বের করে `(দাম, id)` জোড়ার উপর তুলনা হয় (keyset pagination), যাতে
+   * একই দামের দুটো পণ্য সীমানায় হারিয়ে বা দুবার না আসে।
+   */
+  private async listByPrice(query: ProductListQuery): Promise<ProductCardRow[]> {
+    const ids = await this.orderedIdsByPrice(query);
+
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: LIST_SELECT,
+    });
+
+    // `IN` ক্রম রাখে না — SQL-এর ঠিক করা ক্রমে ফিরিয়ে সাজানো হয়
+    const byId = new Map(rows.map((row) => [row.id, row]));
+
+    return ids.flatMap((id) => {
+      const row = byId.get(id);
+      return row ? [row] : [];
+    });
   }
 
   /** Public detail — খসড়া প্রোডাক্ট slug জানা থাকলেও দেখা যাবে না। */
@@ -263,9 +299,20 @@ export class ProductsService {
     }
 
     if (query.search) {
+      /**
+       * `escapeLikePattern` কেন: Prisma-র `contains` ভেতরে ILIKE-এ যায়,
+       * তাই `%` আর `_` সেখানেও wildcard। escape না করলে `search=%`
+       * দিয়ে **পুরো ক্যাটালগ** টেনে আনা যেত — খোঁজা নয়, ডেটা ডাম্প।
+       *
+       * ক্যাটাগরির নামও দেখা হয়, কারণ ক্রেতা অনেক সময় বিভাগের নামই
+       * লেখে ("ইলেকট্রনিক্স"), পণ্যের নাম নয়।
+       */
+      const needle = escapeLikePattern(query.search);
+
       where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { description: { contains: query.search, mode: 'insensitive' } },
+        { name: { contains: needle, mode: 'insensitive' } },
+        { description: { contains: needle, mode: 'insensitive' } },
+        { category: { name: { contains: needle, mode: 'insensitive' } } },
       ];
     }
 
@@ -285,18 +332,101 @@ export class ProductsService {
   }
 
   /**
-   * `id` সবসময় শেষে — cursor pagination-এর জন্য ক্রম অদ্বিতীয় হতে হয়,
-   * নইলে একই createdAt-এর দুটো row পাতার সীমানায় হারিয়ে যেতে পারে।
+   * দামের ক্রমে `id`-র তালিকা, এক query-তে।
+   *
+   * ফিল্টারগুলো (ক্যাটাগরি, খোঁজা, দামের সীমা) Prisma-র `where` থেকেই
+   * আসে — দুই জায়গায় একই নিয়ম আবার লিখলে একদিন অমিল হতো। তাই আগে
+   * Prisma দিয়ে মিলে যাওয়া `id`-গুলো নেওয়া হয়, তারপর সেগুলোর মধ্যে
+   * দামে সাজানো হয়।
+   *
+   * `MIN` নেওয়া হয় **শুধু সক্রিয় variant-এর উপর**, কারণ ক্রেতা
+   * নিষ্ক্রিয় variant কিনতে পারে না — তার দাম ধরে সাজালে পণ্যটা
+   * ভুল জায়গায় বসত। সক্রিয় variant না থাকলে পণ্য তালিকায় থাকে
+   * কিন্তু দামহীন, তাই `NULLS LAST` — দামহীন পণ্য শেষে।
    */
-  private buildListOrder(sort: ProductListQuery['sort']): Prisma.ProductOrderByWithRelationInput[] {
-    switch (sort) {
-      case 'price_asc':
-        return [{ variants: { _count: 'asc' } }, { createdAt: 'desc' }, { id: 'desc' }];
-      case 'price_desc':
-        return [{ variants: { _count: 'desc' } }, { createdAt: 'desc' }, { id: 'desc' }];
-      default:
-        return [{ createdAt: 'desc' }, { id: 'desc' }];
+  private async orderedIdsByPrice(query: ProductListQuery): Promise<string[]> {
+    const candidates = await this.prisma.product.findMany({
+      where: this.buildListWhere(query),
+      select: { id: true },
+    });
+
+    if (candidates.length === 0) {
+      return [];
     }
+
+    const ids = candidates.map((row) => row.id);
+    const ascending = query.sort === 'price_asc';
+    const after = query.cursor ? await this.pricePosition(query.cursor) : null;
+
+    // cursor-এর পণ্য আর নেই (মুছে গেছে বা খসড়া হয়েছে) — তখন পাতা শেষ
+    if (query.cursor !== undefined && after === null) {
+      return [];
+    }
+
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      WITH priced AS (
+        SELECT
+          p."id",
+          (
+            SELECT MIN(v."pricePaisa")
+            FROM product_variants v
+            WHERE v."productId" = p."id" AND v."isActive" = true
+          ) AS price
+        FROM products p
+        WHERE p."id" IN (${Prisma.join(ids)})
+      )
+      SELECT "id"
+      FROM priced
+      WHERE ${
+        after === null
+          ? Prisma.sql`true`
+          : ascending
+            ? Prisma.sql`(COALESCE(price, 9223372036854775807), "id") > (COALESCE(${after.price}::bigint, 9223372036854775807), ${after.id})`
+            : Prisma.sql`(COALESCE(price, -1), "id") < (COALESCE(${after.price}::bigint, -1), ${after.id})`
+      }
+      ORDER BY
+        ${ascending ? Prisma.sql`price ASC NULLS LAST, "id" ASC` : Prisma.sql`price DESC NULLS LAST, "id" DESC`}
+      LIMIT ${query.limit + 1}
+    `;
+
+    return rows.map((row) => row.id);
+  }
+
+  /** cursor-এর পণ্যের দাম — keyset তুলনার জন্য লাগে। */
+  private async pricePosition(cursor: string): Promise<{ price: number | null; id: string } | null> {
+    const product = await this.prisma.product.findFirst({
+      where: { id: cursor, isPublished: true },
+      select: {
+        id: true,
+        variants: {
+          where: { isActive: true },
+          select: { pricePaisa: true },
+          orderBy: { pricePaisa: 'asc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!product) {
+      return null;
+    }
+
+    return { price: product.variants[0]?.pricePaisa ?? null, id: product.id };
+  }
+
+  /** তালিকার কার্ড — list আর search দুই পথেই এক চেহারা। */
+  private toCard(row: ProductCardRow): ProductListResult['items'][number] {
+    return {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      category: row.category,
+      image: row.images[0] ?? null,
+      // তালিকায় "৳৪৫০ থেকে" দেখাতে সবচেয়ে কম দামটাই যথেষ্ট
+      fromPricePaisa: row.variants[0]?.pricePaisa ?? null,
+      comparePricePaisa: row.variants[0]?.comparePricePaisa ?? null,
+      inStock: row.variants.some((variant) => variant.stock > 0),
+    };
   }
 
   private translateWriteError(error: unknown): Error {
@@ -334,6 +464,8 @@ export interface ProductListResult {
 }
 
 export type ProductDetail = Prisma.ProductGetPayload<{ select: typeof DETAIL_SELECT }>;
+
+type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof LIST_SELECT }>;
 
 export interface StockResult {
   id: string;
