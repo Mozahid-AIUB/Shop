@@ -13,102 +13,21 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { ActivityLogService } from '../admin/activity-log/activity-log.service';
 
-const DETAIL_SELECT = {
-  id: true,
-  orderNumber: true,
-  status: true,
-  paymentStatus: true,
-  subtotalPaisa: true,
-  shippingPaisa: true,
-  discountPaisa: true,
-  totalPaisa: true,
-  shipFullName: true,
-  shipPhone: true,
-  shipLine1: true,
-  shipLine2: true,
-  shipCity: true,
-  shipDistrict: true,
-  shipPostcode: true,
-  note: true,
-  createdAt: true,
-  user: { select: { id: true, name: true, email: true, phone: true } },
-  items: {
-    select: {
-      id: true,
-      productName: true,
-      variantSku: true,
-      optionsText: true,
-      unitPricePaisa: true,
-      quantity: true,
-      lineTotalPaisa: true,
-    },
-  },
-  history: {
-    select: {
-      id: true,
-      fromStatus: true,
-      toStatus: true,
-      note: true,
-      createdAt: true,
-      changedBy: { select: { id: true, name: true, email: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  },
-  /**
-   * ঝুঁকির হিসাব **কারণসহ** — এই পাতাতেই অ্যাডমিন সিদ্ধান্ত নেয়।
-   * শুধু "৬৫" দেখলে কেউ কিছু করতে পারে না; "আগে ২টা অর্ডার ফেরত
-   * দিয়েছে" দেখলে সে জানে ফোনে কী জিজ্ঞেস করতে হবে।
-   */
-  fraudCheck: { select: { score: true, level: true, reasons: true } },
-} satisfies Prisma.OrderSelect;
-
-const BOARD_SELECT = {
-  id: true,
-  orderNumber: true,
-  status: true,
-  paymentStatus: true,
-  totalPaisa: true,
-  shipFullName: true,
-  shipPhone: true,
-  shipDistrict: true,
-  createdAt: true,
-  items: { select: { id: true }, },
-  /**
-   * COD ঝুঁকি — তালিকাতেই দেখানো হয়, কারণ অ্যাডমিন এখান থেকেই
-   * সিদ্ধান্ত নেয়। আলাদা পাতায় লুকানো থাকলে কেউ দেখত না।
-   *
-   * `reasons` এখানে আনা হয় না — তালিকা ভারী হতো। "কেন" জানতে
-   * অর্ডারের বিস্তারিত পাতায় যেতে হবে।
-   */
-  fraudCheck: { select: { score: true, level: true } },
-} satisfies Prisma.OrderSelect;
-
-export type OrderFullDetail = Prisma.OrderGetPayload<{ select: typeof DETAIL_SELECT }>;
-
-export interface OrderBoardPage {
-  orders: (Omit<Prisma.OrderGetPayload<{ select: typeof BOARD_SELECT }>, 'items'> & {
-    itemCount: number;
-  })[];
-  total: number;
-  page: number;
-  perPage: number;
-  pageCount: number;
-}
+import {
+  BOARD_SELECT,
+  DETAIL_SELECT,
+  type OrderBoardPage,
+  type OrderFullDetail,
+  type PublicTrackingView,
+} from './order-views';
 
 /**
- * Public tracking-এ যা দেখানো হয় — **টাকার হিসাব নেই**, ইউজারের
- * পরিচয় নেই, ঠিকানার পুরোটা নেই। লগইন ছাড়া এর বেশি দেখানো ঠিক নয়।
+ * আকারগুলো এখান থেকেও re-export হয়।
+ *
+ * Phase 07-এর controller আর Phase 09-এর রিপোর্ট এগুলো এই পথে
+ * import করে। সরিয়ে দিলে ওদের import ভাঙত, অথচ লাভ কিছু ছিল না।
  */
-export interface PublicTrackingView {
-  orderNumber: string;
-  status: OrderStatus;
-  placedAt: Date;
-  /** শহর/জেলা যথেষ্ট — কাস্টমার বুঝবে কোথায় যাচ্ছে */
-  shipCity: string;
-  shipDistrict: string;
-  items: { productName: string; optionsText: string | null; quantity: number }[];
-  history: { toStatus: OrderStatus; createdAt: Date }[];
-}
+export type { OrderBoardPage, OrderFullDetail, PublicTrackingView } from './order-views';
 
 /**
  * কোন role কোন transition করতে পারে।
@@ -257,6 +176,24 @@ export class OrderLifecycleService {
         shipDistrict: true,
         items: { select: { productName: true, optionsText: true, quantity: true } },
         history: { select: { toStatus: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
+        /**
+         * সর্বশেষ পার্সেল।
+         *
+         * একটা অর্ডারে একাধিক পার্সেল থাকতে পারে (ফেরত এসে আবার
+         * পাঠানো), আর ক্রেতার কাছে **এখন কোথায়** সেটাই দরকার —
+         * পুরোনো ব্যর্থ চেষ্টার তালিকা তাকে বিভ্রান্ত করত।
+         */
+        shipments: {
+          select: {
+            courier: true,
+            trackingCode: true,
+            status: true,
+            dispatchedAt: true,
+            deliveredAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
     });
 
@@ -273,6 +210,7 @@ export class OrderLifecycleService {
       shipDistrict: order.shipDistrict,
       items: order.items,
       history: order.history,
+      shipment: order.shipments[0] ?? null,
     };
   }
 
@@ -314,6 +252,64 @@ export class OrderLifecycleService {
   }
 
   /**
+   * কুরিয়ারে পাঠানো হলে অর্ডার `SHIPPED` (Phase 10)।
+   *
+   * **`changeStatus` ব্যবহার করা হয় না** কারণ সেটা orderNumber আর
+   * actor-এর role চায়, আর ভূমিকার নিয়ম আবার যাচাই করে। পার্সেল
+   * তৈরি করার অনুমতি আগেই যাচাই হয়ে গেছে — দুবার করলে
+   * `ORDER_MANAGER` পার্সেল পাঠাতে পেরেও অর্ডার এগোতে পারত না।
+   *
+   * transition বৈধ কিনা তবু দেখা হয়, যাতে নিয়ম দুই জায়গায়
+   * আলাদা হয়ে না যায়।
+   */
+  async markShipped(orderId: string, actorId: string, courierLabel: string): Promise<void> {
+    await this.advanceForCourier(orderId, 'SHIPPED', actorId, `${courierLabel}-এ পাঠানো হয়েছে`);
+  }
+
+  /**
+   * পার্সেল পৌঁছে গেলে অর্ডার `DELIVERED` (Phase 10)।
+   *
+   * `actorId` `null` হতে পারে — webhook থেকে এলে কোনো মানুষ এটা
+   * করেনি, আর ভুয়া actor বসালে audit log মিথ্যা বলত।
+   */
+  async markDelivered(orderId: string, actorId: string | null): Promise<void> {
+    await this.advanceForCourier(orderId, 'DELIVERED', actorId, 'কুরিয়ার পৌঁছে দিয়েছে');
+  }
+
+  /**
+   * কুরিয়ারের ঘটনা থেকে অর্ডার এগিয়ে নেওয়া।
+   *
+   * **বৈধ না হলে চুপচাপ ফিরে যায়, throw করে না।** কুরিয়ারের
+   * webhook ক্রমে আসে না আর দেরিতেও আসে; একটা অপ্রত্যাশিত ঘটনায়
+   * পার্সেলের আপডেট ব্যর্থ করা মানে আসল তথ্যটাও হারানো।
+   */
+  private async advanceForCourier(
+    orderId: string,
+    to: OrderStatus,
+    actorId: string | null,
+    note: string,
+  ): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { status: true },
+    });
+
+    if (order === null || !canTransition(order.status, to)) {
+      return;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await this.applyStatus(tx, {
+        orderId,
+        from: order.status,
+        to,
+        changedById: actorId,
+        note,
+      });
+    });
+  }
+
+  /**
    * status বসায়, ইতিহাসে লেখে, আর বাতিল হলে স্টক ফেরত দেয় —
    * সবটা caller-এর transaction-এর ভেতরে, তাই অর্ধেক হওয়ার সুযোগ নেই।
    */
@@ -323,7 +319,8 @@ export class OrderLifecycleService {
       orderId: string;
       from: OrderStatus;
       to: OrderStatus;
-      changedById: string;
+      /** `null` = সিস্টেম (কুরিয়ারের webhook) — কোনো মানুষ করেনি */
+      changedById: string | null;
       note: string | null;
     },
   ): Promise<void> {

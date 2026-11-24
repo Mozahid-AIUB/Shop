@@ -106,22 +106,37 @@
 
 ## Phase 10 — Courier
 
-> **সিদ্ধান্ত:** API key যে ব্যবহার করবে সে-ই দেবে (`.env`-এ)। key
-> কুরিয়ার কোম্পানির সাথে করা **ব্যবসার নিজের অ্যাকাউন্টে** বাঁধা —
-> এক key দিয়ে অন্যের পার্সেল পাঠালে বিল আর COD-র টাকা ভুল
-> অ্যাকাউন্টে যেত।
+> **সিদ্ধান্ত (বদলেছে):** key **অ্যাডমিন প্যানেল থেকে** বসানো হয়,
+> `.env`-এ নয় — `.env`-এ শুধু এনক্রিপশনের মূল চাবি। key ব্যবসার
+> নিজের কুরিয়ার-অ্যাকাউন্টে বাঁধা, তাই যে কোড কিনবে তাকে নিজের key
+> বসাতে হবে; সার্ভারে SSH করে ফাইল এডিট করা সে পারবে না।
 
-- [ ] 10.1 `CourierProvider` interface — createParcel / track / cancel
-- [ ] 10.2 **`manual.provider.ts` — key ছাড়াই চলে (এটা আগে)**
-      হাতে ট্র্যাকিং নম্বর বসানো। না থাকলে যে কোড কিনল তার
-      Steadfast চুক্তি হওয়ার আগ পর্যন্ত সাইটই অচল থাকত
-- [ ] 10.3 Steadfast adapter — **sandbox key লাগবে**
-- [ ] 10.4 Pathao adapter — **key লাগবে**
-- [ ] 10.5 RedX adapter — **key লাগবে**
-- [ ] 10.6 Order → consignment (এক ক্লিক)
-- [ ] 10.7 Webhook → delivery status sync
-- [ ] 10.8 **টেস্ট:** webhook signature verify, duplicate webhook
-- [ ] 10.9 **টেস্ট:** key না থাকলে `manual`-এ পড়ে, সাইট চলে
+- [x] 10.1 `CourierProvider` interface — createParcel / track / cancel
+- [x] 10.2 **`manual.provider.ts` — key ছাড়াই চলে**
+      হাতে ট্র্যাকিং নম্বর বসানো। এটাই ফ্রেশ ইনস্টলের ভরসা,
+      তাই অ্যাকাউন্টটা migration-এ তৈরি হয় (seed-এ নয়)
+- [x] 10.3 **সেটআপ অ্যাডমিন প্যানেল থেকে** — key DB-তে এনক্রিপ্টেড
+      (`.env`-এ শুধু মূল চাবি)। প্ল্যানে আগে `.env`-এ key রাখার কথা
+      ছিল; মালিকের সিদ্ধান্তে UI-তে সরানো হলো, কারণ যে ব্যবসায়ী
+      কোড কিনবে সে সার্ভারে SSH করে ফাইল এডিট করবে না
+- [x] 10.4 Order → consignment (এক ক্লিক) + অর্ডার `SHIPPED`
+- [x] 10.5 Webhook গ্রহণ → delivery status sync
+- [x] 10.6 **টেস্ট:** webhook signature verify, duplicate webhook
+- [x] 10.7 **টেস্ট:** key না থাকলে সাইট চলে (`MANUAL`-এ)
+- [x] 10.8 **টেস্ট:** key কখনো response-এ ফেরে না, DB-তে এনক্রিপ্টেড
+
+**বাকি — চারটা adapter, প্রত্যেকের merchant ডক লাগবে:**
+
+- [ ] 10.9 Steadfast adapter — **merchant dashboard-এর ডক + sandbox key**
+- [ ] 10.10 Pathao adapter — **ডক + key** (OAuth, টোকেনের মেয়াদ আছে)
+- [ ] 10.11 RedX adapter — **ডক + key**
+- [ ] 10.12 Carrybee adapter — **ডক + key**
+
+> চারটার কারোরই আসল API ডকুমেন্টেশন পাবলিক নয় — শুধু third-party
+> wrapper পাওয়া যায়, আর তাদের মধ্যেই অমিল। অনুমান করে লিখলে
+> চারটাই ভুল হতো, আর key বসানোর পর ব্যর্থ হতো — তখন বোঝাই যেত না
+> ভুলটা key-তে না কোডে। মাঠগুলো `COURIER_CREDENTIAL_FIELDS`-এ
+> আগেই লেখা, registry-তে একটা লাইন যোগ করলেই নতুন adapter বসে।
 
 ---
 

@@ -56,22 +56,12 @@ export const PAYMENT_STATUSES = ['UNPAID', 'PARTIAL', 'PAID', 'REFUNDED'] as con
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 /**
- * কুরিয়ার — Phase 12-এ adapter লেখা হবে।
- * `MANUAL` মানে নিজের লোক দিয়ে ডেলিভারি, কোনো API নেই।
+ * courier আর shipment-এর constants — পুরোটা `constants/courier.ts`-এ (Phase 10)।
+ *
+ * এখান থেকে re-export, যাতে পুরোনো import ভাঙে না।
  */
-export const COURIERS = ['STEADFAST', 'PATHAO', 'REDX', 'MANUAL'] as const;
-export type Courier = (typeof COURIERS)[number];
-
-/** শিপমেন্টের অবস্থা — কুরিয়ার webhook এগুলোতে map হবে। */
-export const SHIPMENT_STATUSES = [
-  'PENDING',
-  'PICKED_UP',
-  'IN_TRANSIT',
-  'DELIVERED',
-  'RETURNED',
-  'CANCELLED',
-] as const;
-export type ShipmentStatus = (typeof SHIPMENT_STATUSES)[number];
+export { COURIERS, SHIPMENT_STATUSES } from './courier';
+export type { Courier, ShipmentStatus } from './courier';
 
 /**
  * COD ঢ়ুঁকির স্তর — Phase 13।

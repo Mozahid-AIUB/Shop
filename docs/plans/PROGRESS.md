@@ -13,7 +13,7 @@
 | 07 | Admin Panel (production + audit) | ✅ শেষ (backend) | `07-admin-panel.md` |
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
 | 09 | Reports + Analytics | ✅ শেষ (backend) | `09-reports.md` |
-| 10 | Courier (Steadfast/Pathao/RedX) | ⬜ বাকি | — |
+| 10 | Courier (ভিত্তি + নিজের ডেলিভারি) | ✅ শেষ (backend) | `10-courier.md` |
 | 11 | Fraud Guard (COD risk) | ✅ শেষ (backend) | `11-fraud-guard.md` |
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening (rate limit, helmet, log) | ✅ শেষ (backend) | `13-hardening.md` |
@@ -22,7 +22,7 @@
 | 18 | Guest Checkout | ✅ শেষ (backend) | `18-guest-checkout.md` |
 | 16, 17, 19-22 | Search, Review, Wishlist, Return, CMS, SEO | ⬜ বাকি | `14-commerce-essentials.md` |
 
-**এখন কোথায়:** Phase 02-07, 09, 11, 13, 14, 15, 18 — সব `main`-এ merge ও push।
+**এখন কোথায়:** Phase 02-07, 09, 10, 11, 13, 14, 15, 18 — সব `main`-এ merge ও push।
 বাকি Phase 16, 17, 19-22 (e-commerce-র বাদ পড়া মডিউলগুলো)।
 
 Phase 11 (Fraud Guard) শেষ — COD ঝুঁকির স্কোর checkout-এ, কিন্তু
@@ -40,6 +40,25 @@ Phase 15 (Coupon) শেষ — তিন ধরনের ছাড়: শত�
 নির্দিষ্ট টাকা, আর ফ্রি ডেলিভারি। **ছাড় কখনো ক্লায়েন্ট থেকে নেওয়া
 হয় না** — API শুধু কোড নেয়, হিসাব সার্ভারে। মেয়াদ, সর্বোচ্চ ব্যবহার,
 প্রতি-ইউজার সীমা, ন্যূনতম অর্ডার — সব অ্যাডমিন ঠিক করে, কোডে কিছু নয়।
+
+Phase 10 (Courier) — **ভিত্তি শেষ, নিজের ডেলিভারি পুরো কাজ করছে**।
+
+অর্ডার এক ক্লিকে কুরিয়ারে যায়, অর্ডার `SHIPPED` হয়, webhook এলে
+নিজে থেকে `DELIVERED` হয়। `MANUAL` (নিজের ডেলিভারি) **key ছাড়াই
+চলে** আর অ্যাকাউন্টটা migration-এ তৈরি হয় — তাই ফ্রেশ ইনস্টলে
+কুরিয়ারের চুক্তি হওয়ার আগেই দোকান চালু করা যায়।
+
+**সেটআপ পুরোটা অ্যাডমিন প্যানেল থেকে** (মালিকের সিদ্ধান্ত; প্ল্যানে
+আগে `.env`-এ key রাখার কথা ছিল)। `.env`-এ শুধু
+`COURIER_SECRET_KEY` — এনক্রিপশনের মূল চাবি, কোনো কুরিয়ারের key নয়।
+key DB-তে AES-256-GCM দিয়ে এনক্রিপ্টেড, response-এ কখনো ফেরে না
+(শুধু শেষ ৪ অক্ষর), আর webhook secret ছাড়া webhook ৪০১।
+
+**বাকি: চারটা adapter** (Steadfast, Pathao, RedX, Carrybee)।
+চারটার কারোরই আসল API ডক পাবলিক নয় — শুধু third-party wrapper, আর
+তাদের মধ্যেই অমিল। অনুমান করে লিখলে key বসানোর পর ব্যর্থ হতো আর
+কারণ বোঝা যেত না। **মালিকের merchant dashboard-এর ডক + sandbox key
+লাগবে**; registry-তে একটা লাইন যোগ করলেই নতুন adapter বসে।
 
 Phase 18 (Guest Checkout) শেষ — **অ্যাকাউন্ট ছাড়া কেনা যায়**।
 অর্ডার অ্যাডমিন প্যানেলে সদস্যের অর্ডারের মতোই দেখায় (নাম-ফোন
@@ -60,7 +79,7 @@ Phase 18 (Guest Checkout) শেষ — **অ্যাকাউন্ট ছা�
   খুলেছি)। ছোট অর্ডারে ধরা হয় না, নইলে অ্যাডমিন তালিকা পড়াই
   বন্ধ করে দিত।
 
-**৩৪৩টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint (তিন প্যাকেজেই),
+**৩৯৯টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint (তিন প্যাকেজেই),
 coverage threshold আর build পরিষ্কার।
 
 **এখন যা বাকি — তিনটাই মালিকের ব্যবস্থার অপেক্ষায়:**
