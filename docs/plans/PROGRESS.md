@@ -14,24 +14,32 @@
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
 | 09 | Reports + Analytics | ✅ শেষ (backend) | `09-reports.md` |
 | 10 | Courier (Steadfast/Pathao/RedX) | ⬜ বাকি | — |
-| 11 | Fraud Guard (COD risk) | ⬜ বাকি | — |
+| 11 | Fraud Guard (COD risk) | ✅ শেষ (backend) | `11-fraud-guard.md` |
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening (rate limit, helmet, log) | ✅ শেষ (backend) | `13-hardening.md` |
 
-**এখন কোথায়:** Phase 02-07 আর 13 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
-Phase 09 (Reports) **শেষ** — branch `phase/09-reports`: ৫টা endpoint
-(`summary`, `sales`, `best-sellers`, `status-breakdown`, `repeat-customers`),
-সবগুলো **শুধু `SUPER_ADMIN`**। টাকার তিনটা সংখ্যা আলাদা:
-ordered / collected / due — COD-তে অর্ডার হওয়া আর টাকা পাওয়া এক নয়।
-বাতিল অর্ডার টাকার হিসাবে নেই, কিন্তু status breakdown-এ দেখানো হয়
-(কত হারাচ্ছি সেটা জানা দরকার)। `admin/` ফোল্ডার sub-folder-এ ভাগ করা হয়েছে:
-`production/`, `activity-log/`, `invoice/`, `reports/`।
-**২০৬টা API টেস্ট (১৫টা suite) সবুজ**, lint ও build পরিষ্কার
-(`packages/shared/dist` মুছে CI-র মতো অবস্থা থেকেও যাচাই করা)।
-**পরের কাজ:** Phase 11 — Fraud Guard (বাইরের কিছু লাগে না)।
-সিদ্ধান্ত: আগে পুরো backend, UI তারপর।
-**Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
-Phase 12-এ Meta token নেই — ওই তিনটায় তোমার ব্যবস্থা লাগবে।
+**এখন কোথায়:** Phase 02-07, 09, 11 আর 13 — সব `main`-এ merge ও push।
+**বাইরের জিনিস ছাড়া করার মতো সব backend শেষ।**
+
+Phase 11 (Fraud Guard) শেষ — COD ঝুঁকির স্কোর checkout-এ, কিন্তু
+**কখনো অর্ডার আটকায় না** (সিদ্ধান্ত: আসল ক্রেতা হারানোর ক্ষতি অদৃশ্য
+ও স্থায়ী)। সংকেত: ফেরতের ইতিহাস, একই ফোনে বারবার অর্ডার, নতুন
+অ্যাকাউন্ট + বড় COD, একই ঠিকানা। সফল ডেলিভারি স্কোর কমায়।
+কারণসহ সংরক্ষিত হয়, যাতে অ্যাডমিন জানে ফোনে কী জিজ্ঞেস করতে হবে।
+
+**২২৭টা API টেস্ট + ৩টা web টেস্ট সবুজ**, lint (তিন প্যাকেজেই),
+coverage threshold আর build পরিষ্কার।
+
+**এখন যা বাকি — তিনটাই মালিকের ব্যবস্থার অপেক্ষায়:**
+
+| Phase | কী লাগবে |
+|---|---|
+| 08 Notifications | Redis সার্ভার (BullMQ) |
+| 10 Courier | Steadfast/Pathao/RedX API key — তবে `manual` provider key ছাড়াই করা যায় |
+| 12 Meta Pixel | Meta Pixel ID + access token |
+
+তারপর frontend। সিদ্ধান্ত: আগে পুরো backend, UI তারপর।
+
 
 **Phase 13-এ প্ল্যান থেকে সরানো:** DB backup cron আর VPS deploy (আসল সার্ভার
 লাগবে), Playwright E2E (UI লাগবে) — তিনটাই deploy-এর আগে, আলাদা phase-এ।
@@ -152,3 +160,28 @@ courier/
   (`to_char(... AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD')`), আর
   `main.ts` ও `jest-setup.ts`-এ `TZ=Asia/Dhaka` বাঁধা আছে।
   সন্দেহ হলে `TZ=UTC npm run test -w @shop/api` চালিয়ে দেখো
+- **web-এর টেস্ট `npm run test:web` দিয়ে চালাও**, `npm run test -w @shop/web`
+  দিয়ে নয়। Windows-এ npm workspace ছোট হাতের drive letter দেয় (`d:/…`),
+  Vite তখন `d:/` আর `D:/` আলাদা ধরে নিজের runtime দুবার লোড করে আর
+  `describe` undefined হয়ে যায় — টেস্ট ভাঙা মনে হয়, আসলে পথের সমস্যা
+  (দেখো: `scripts/run-web-tests.mjs`)
+
+## কোডের গুণমান — কী কী স্বয়ংক্রিয়ভাবে যাচাই হয়
+
+| যাচাই | কোথায় | সীমা |
+|---|---|---|
+| TypeScript strict | তিন প্যাকেজেই | `noUncheckedIndexedAccess` সহ |
+| `any` নিষেধ | eslint | error |
+| কোড জটিলতা | eslint | `complexity` ১২, `max-depth` ৪ |
+| ফাইল/ফাংশনের দৈর্ঘ্য | eslint | ৩৫০ / ৯০ লাইন (কমেন্ট বাদে) |
+| প্যারামিটার সংখ্যা | eslint | ৫ |
+| টেস্ট coverage | jest threshold | ৮০% statement, ৬০% branch |
+
+**এখনকার coverage:** statement ৮৬%, branch ৬৮%, function ৮৭%।
+সীমা তার একটু নিচে বসানো — আজকের কোড পাস করে, কিন্তু **অবনতি হলে
+CI ভাঙবে**। সীমা বাড়াতে চাইলে `apps/api/package.json`-এর
+`coverageThreshold`।
+
+`packages/shared`-এ **আগে lint ছিল না** (api আর web-এর ছিল)। যোগ করার
+পর প্রথম চালাতেই একটা অব্যবহৃত import ধরা পড়েছে। এখানেই টাকার হিসাব
+আর ঝুঁকির স্কোর, তাই এটাই সবচেয়ে জরুরি জায়গা ছিল।

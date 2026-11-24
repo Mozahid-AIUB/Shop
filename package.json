@@ -2,7 +2,7 @@
   "name": "shop-platform",
   "version": "0.1.0",
   "private": true,
-  "description": "Professional e-commerce platform \u2014 catalog, orders, payments, courier, admin",
+  "description": "Professional e-commerce platform — catalog, orders, payments, courier, admin",
   "engines": {
     "node": ">=22"
   },
@@ -17,7 +17,7 @@
     "//build": "shared আগে — api আর web দুটোই ওর dist থেকে টাইপ পড়ে, তাই এটা বাদ দিলে fresh clone-এ build ভাঙে",
     "build": "npm run build -w @shop/shared && npm run build -w @shop/api && npm run build -w @shop/web",
     "test": "npm run test -w @shop/api && npm run test:web",
-    "lint": "npm run lint -w @shop/api && npm run lint -w @shop/web",
+    "lint": "npm run lint -w @shop/shared && npm run lint -w @shop/api && npm run lint -w @shop/web",
     "db:migrate": "npm run db:migrate -w @shop/api",
     "db:studio": "npm run db:studio -w @shop/api",
     "db:seed": "npm run db:seed -w @shop/api",
