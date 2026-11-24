@@ -75,6 +75,7 @@ export class CourierAccountService {
           isDefault: input.isDefault,
           isSandbox: input.isSandbox,
           defaultWeightGrams: input.defaultWeightGrams,
+          allowOpenBox: input.allowOpenBox,
         },
       });
 
@@ -135,6 +136,7 @@ export class CourierAccountService {
           isDefault: input.isDefault,
           isSandbox: input.isSandbox,
           defaultWeightGrams: input.defaultWeightGrams,
+          allowOpenBox: input.allowOpenBox,
         },
       });
 
@@ -233,6 +235,7 @@ export class CourierAccountService {
     return {
       credentials,
       isSandbox: account.isSandbox,
+      allowOpenBox: account.allowOpenBox,
       oauthToken: account.oauthToken === null ? null : this.openToken(account.oauthToken),
       saveOauthToken: async (token: string): Promise<void> => {
         await this.prisma.courierAccount.update({
@@ -381,6 +384,7 @@ export class CourierAccountService {
       isDefault: account.isDefault,
       isSandbox: account.isSandbox,
       defaultWeightGrams: account.defaultWeightGrams,
+      allowOpenBox: account.allowOpenBox,
       credentialHints,
       missingFields: required.filter((field) => (credentials[field] ?? '') === ''),
       hasWebhookSecret: account.webhookSecret !== null,

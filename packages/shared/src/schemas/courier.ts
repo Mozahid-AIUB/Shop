@@ -101,6 +101,18 @@ export const courierAccountInputSchema = z
       .min(1, 'ওজন অন্তত ১ গ্রাম')
       .max(50_000, 'ওজন ৫০ কেজির বেশি নয়')
       .default(500),
+
+    /**
+     * ক্রেতা টাকা দেওয়ার আগে পার্সেল খুলে দেখতে পারবে কি না।
+     *
+     * পণ্যভেদে ঠিক উত্তর আলাদা: ইলেকট্রনিক্সে খুলে দেখা **দরকার**,
+     * কাস্টম ছাপা বা সিল করা পণ্যে **ক্ষতিকর** (ফেরত এলে আর বেচা
+     * যায় না)। তাই অ্যাডমিনের সিদ্ধান্ত।
+     *
+     * ডিফল্ট `true` — বেশিরভাগ দোকানে সেটাই ঠিক, আর নতুন দোকানে
+     * ক্রেতার বিশ্বাসই সবচেয়ে বড় বাধা।
+     */
+    allowOpenBox: z.boolean().default(true),
     isActive: z.boolean().default(false),
     isDefault: z.boolean().default(false),
     isSandbox: z.boolean().default(false),
@@ -125,6 +137,7 @@ export const courierAccountUpdateSchema = z.object({
   credentials: credentialsSchema.nullable().optional(),
   webhookSecret: z.string().trim().min(16).max(200).nullable().optional(),
   defaultWeightGrams: z.number().int().min(1).max(50_000).optional(),
+  allowOpenBox: z.boolean().optional(),
   isActive: z.boolean().optional(),
   isDefault: z.boolean().optional(),
   isSandbox: z.boolean().optional(),
@@ -181,6 +194,7 @@ export type CourierAccountView = {
   isDefault: boolean;
   isSandbox: boolean;
   defaultWeightGrams: number;
+  allowOpenBox: boolean;
   /** কোন মাঠ বসানো আছে → masked মান। অনুপস্থিত মাঠ এখানে থাকে না */
   credentialHints: Record<string, string>;
   /** যে মাঠগুলো এখনো বসানো হয়নি — প্যানেল লাল দেখাতে পারে */

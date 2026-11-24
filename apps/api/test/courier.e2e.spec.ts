@@ -642,6 +642,41 @@ describe('Courier', () => {
     });
   });
 
+  describe('what the customer may do at the door', () => {
+    /**
+     * **খুলে দেখার সুইচ অ্যাডমিনের হাতে।**
+     *
+     * পণ্যভেদে ঠিক উত্তর আলাদা — ইলেকট্রনিক্সে খুলে দেখা দরকার,
+     * কাস্টম ছাপা বা সিল করা পণ্যে ক্ষতিকর। এই কোড অন্য
+     * ব্যবসায়ীদের কাছেও যাবে, তাই হার্ডকোড করা যায় না।
+     */
+    it('lets the admin decide whether a parcel may be opened before paying', async () => {
+      const accounts = await request(app.getHttpServer())
+        .get('/admin/couriers')
+        .set(authed(adminToken))
+        .expect(200);
+
+      const manual = accounts.body.find((a: { kind: string }) => a.kind === 'MANUAL');
+
+      // ডিফল্টে খুলে দেখা যায় — নতুন দোকানে বিশ্বাসটাই সবচেয়ে বড় বাধা
+      expect(manual.allowOpenBox).toBe(true);
+
+      const updated = await request(app.getHttpServer())
+        .patch(`/admin/couriers/${manual.id}`)
+        .set(authed(adminToken))
+        .send({ allowOpenBox: false })
+        .expect(200);
+
+      expect(updated.body.allowOpenBox).toBe(false);
+
+      // পরের টেস্টগুলোর জন্য ফিরিয়ে দেওয়া
+      await prisma.courierAccount.update({
+        where: { kind: 'MANUAL' },
+        data: { allowOpenBox: true },
+      });
+    });
+  });
+
   describe('updating a parcel by hand', () => {
     /** `MANUAL` কুরিয়ারে এটাই একমাত্র পথ — webhook পাঠানোর কেউ নেই। */
     it('lets the admin move a manual parcel forward', async () => {
