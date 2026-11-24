@@ -61,6 +61,52 @@ rate limit এখন **মেমরিতে** — এক instance চলছে 
 (magic byte, SVG XSS, presigned URL), তাই local disk-এ করে পরে S3-এ সরানোর
 বদলে একবারেই আসল storage দিয়ে করা হবে।
 
+
+## সিদ্ধান্ত — প্রোডাক্টের ধরন (২৪ নভেম্বর ২০২৬)
+
+**এটা SaaS নয়, source code বিক্রির প্রোডাক্ট।** মালিক নিজে ব্যবহার করবে,
+আর অন্য ব্যবসায়ীদের কাছে কোড বিক্রি করবে — প্রত্যেকে **নিজের সার্ভারে
+নিজের ইনস্টল** চালাবে।
+
+**তাই multi-tenant (`shopId`) করা হবে না** — এক ইনস্টল = এক দোকান।
+`shopId` যোগ করলে প্রতিটা query-তে অকারণ ফিল্টার আর জটিলতা বাড়ত,
+অথচ দুই দোকানের ডেটা কখনো এক DB-তে থাকবেই না।
+
+**এর ফল যা মাথায় রাখতে হবে:**
+
+- কোনো key, secret বা ব্যবসার নাম কোডে hardcode করা যাবে না —
+  সবই `.env`-এ, আর `.env.example`-এ ব্যাখ্যাসহ ফাঁকা রাখতে হবে
+- যে কিনবে তার হয়তো প্রথম দিনে কুরিয়ার/SMS-এর চুক্তি থাকবে না,
+  তাই **key ছাড়াও সাইট সম্পূর্ণ চলতে হবে** (manual fallback)
+- সেটআপ সহজ হতে হবে: `.env` ভরো → migrate → seed → চলে
+
+## সিদ্ধান্ত — কুরিয়ার (Phase 10)
+
+**যার যার API key সে নিজে দেবে।** কারণ key কুরিয়ার কোম্পানির সাথে
+করা **ব্যবসার নিজের অ্যাকাউন্টে** বাঁধা — এক key দিয়ে অন্যের পার্সেল
+পাঠালে বিল আর COD-র টাকা ভুল লোকের অ্যাকাউন্টে যেত।
+
+**গঠন:** এক interface, একাধিক provider —
+
+```
+courier/
+  courier.interface.ts   createParcel / trackParcel / cancelParcel
+  steadfast.provider.ts
+  pathao.provider.ts
+  redx.provider.ts
+  manual.provider.ts     key ছাড়া ডিফল্ট
+```
+
+`.env`-এ `COURIER_PROVIDER` দিয়ে বাছাই, key-ও ওখানেই।
+
+**`manual` provider সবচেয়ে জরুরি:** key না থাকলে অ্যাডমিন হাতে ট্র্যাকিং
+নম্বর বসাবে আর সব কাজ চলবে। এটা না থাকলে যে কোড কিনল তার Steadfast
+চুক্তি হওয়ার আগ পর্যন্ত সাইটই অচল থাকত।
+
+**`manual` অংশটা এখনই করা যায়** (key লাগে না)। আসল তিনটা provider
+লিখতে sandbox key লাগবে — অনুমানে লিখলে ডকুমেন্টেশন আর বাস্তবের
+পার্থক্যে ভাঙবে।
+
 ## খোলা finding (ship-review থেকে, push আটকায় না)
 
 - **Medium — `GET /orders` unbounded** (`apps/api/src/modules/orders/orders.service.ts:207`):
@@ -99,3 +145,10 @@ rate limit এখন **মেমরিতে** — এক instance চলছে 
 - **schema-তে নতুন model যোগ করলে `npx prisma generate` চালাও** (apps/api থেকে),
   নইলে `tx.payment does not exist` ধরনের TS error আসে — migration চললেও
   client-এ নতুন টাইপ আসে না
+- **তারিখ নিয়ে কাজ করলে টাইমজোন মাথায় রাখো** — এই মেশিনের ঘড়ি ঢাকার,
+  কিন্তু CI runner আর VPS প্রায় সবসময় **UTC**। DB থেকে `Date` এনে
+  JavaScript-এ ফরম্যাট করলে দিন বদলে যায় (ঢাকার ভোরের অর্ডার UTC-তে
+  আগের দিনে পড়ে)। **সমাধান:** দিনের হিসাব Postgres-এই সারো
+  (`to_char(... AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD')`), আর
+  `main.ts` ও `jest-setup.ts`-এ `TZ=Asia/Dhaka` বাঁধা আছে।
+  সন্দেহ হলে `TZ=UTC npm run test -w @shop/api` চালিয়ে দেখো

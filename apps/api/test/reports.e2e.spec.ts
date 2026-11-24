@@ -356,9 +356,17 @@ describe('Reports', () => {
       expect(Array.isArray(response.body)).toBe(true);
       expect(response.body.length).toBeGreaterThan(0);
 
-      const point = response.body[0];
-      expect(point.date).toBe(today);
+      /**
+       * প্রথম সারি ধরা যায় না। range-এর সীমানা সার্ভারের ঘড়ি ধরে
+       * গোনা হয়, কিন্তু দিন ভাগ হয় ঢাকার সময়ে — তাই UTC মেশিনে
+       * আগের দিনের একটা সারিও জানালার ভেতরে পড়তে পারে।
+       * আজকের সারিটাই খুঁজে নেওয়া হয়।
+       */
+      const point = response.body.find((row: { date: string }) => row.date === today);
+
+      expect(point).toBeDefined();
       expect(point.orderCount).toBeGreaterThan(0);
+      expect(point.orderedPaisa).toBeGreaterThan(0);
     });
   });
 
