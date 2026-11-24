@@ -298,6 +298,8 @@ model Order {
   history  OrderStatusHistory[]
   payments Payment[]
   tasks    ProductionTask[]
+  /// COD ঝুঁকির হিসাব — checkout-এর সময় একবার
+  fraudCheck FraudCheck?
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -475,4 +477,39 @@ model OrderCounter {
   lastSerial Int    @default(0)
 
   @@map("order_counters")
+}
+
+/// COD ঝুঁকির স্তর — `packages/shared/constants/fraud.ts`-এর সাথে মেলে।
+enum FraudLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// অর্ডারের সময়কার ঝুঁকির হিসাব।
+///
+/// **কেন অর্ডারের সাথে সংরক্ষণ করা হয়, প্রতিবার হিসাব নয়:** স্কোর
+/// ওই মুহূর্তের তথ্যের উপর নির্ভর করে। পরে কাস্টমার আরও অর্ডার
+/// করলে বা বাতিল করলে স্কোর বদলাবে — কিন্তু "তখন কেন পাঠানো
+/// হয়েছিল" প্রশ্নের উত্তর তখনকার স্কোরেই আছে।
+///
+/// **কেন আলাদা `CustomerRiskProfile` নয়:** ঝুঁকি কাস্টমারের স্থায়ী
+/// বৈশিষ্ট্য নয়, প্রতি অর্ডারের প্রসঙ্গে আলাদা (ছোট অর্ডার বনাম বড়)।
+/// আলাদা profile রাখলে সেটা বাসি হয়ে যেত।
+model FraudCheck {
+  id      String     @id @default(cuid())
+  orderId String     @unique
+  score   Int
+  level   FraudLevel
+
+  /// কোন কোন কারণে এই স্কোর — ব্যাখ্যা ছাড়া সংখ্যা অর্থহীন,
+  /// অ্যাডমিন জানবে না ফোনে কী জিজ্ঞেস করতে হবে
+  reasons Json
+
+  createdAt DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([level, createdAt])
+  @@map("fraud_checks")
 }

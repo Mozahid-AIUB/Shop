@@ -1,4 +1,5 @@
 export * from './types/health';
+export * from './constants/fraud';
 export * from './constants/order';
 export * from './constants/order-number';
 export * from './constants/payment';

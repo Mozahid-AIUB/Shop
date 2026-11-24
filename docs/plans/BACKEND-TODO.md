@@ -118,11 +118,11 @@
 
 ## Phase 11 — Fraud Guard
 
-- [ ] 11.1 Schema: `CustomerRiskProfile`, `FraudSignal`
-- [ ] 11.2 Risk score — return history, একই ফোন/IP-তে বারবার অর্ডার, ঠিকানা মিল
-- [ ] 11.3 কুরিয়ার return history API (Steadfast fraud check)
-- [ ] 11.4 Auto-block নিয়ম + manual review queue
-- [ ] 11.5 **টেস্ট:** ভালো কাস্টমার যেন ব্লক না হয় (false positive)
+- [x] 11.1 Schema: `FraudCheck` (`CustomerRiskProfile` নয় — কারণ `11-fraud-guard.md`-এ)
+- [x] 11.2 Risk score — ফেরতের ইতিহাস, একই ফোনে বারবার অর্ডার, ঠিকানা মিল
+- [ ] 11.3 কুরিয়ার return history API (Steadfast) — **API key লাগবে**, Phase 10-এ
+- [x] 11.4 ~~Auto-block~~ → **শুধু ফ্ল্যাগ**, ব্লক নয় (সিদ্ধান্ত: আসল ক্রেতা হারানোর ঝুঁকি বেশি)
+- [x] 11.5 **টেস্ট:** ভালো কাস্টমার যেন ব্লক না হয় (false positive)
 
 ---
 

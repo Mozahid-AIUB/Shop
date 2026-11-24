@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import type { CheckoutInput } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { formatOptions } from './cart.service';
+import { FraudService } from './fraud.service';
 import { OrderNumberService } from './order-number.service';
 
 const ORDER_LIST_SELECT = {
@@ -79,6 +80,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orderNumbers: OrderNumberService,
+    private readonly fraud: FraudService,
   ) {}
 
   /**
@@ -147,7 +149,7 @@ export class OrdersService {
     const shippingPaisa = 0;
     const discountPaisa = 0;
 
-    return this.prisma.$transaction(
+    const created = await this.prisma.$transaction(
       async (tx) => {
         /**
          * স্টক কমানো — conditional update, এটাই oversell-এর আসল রক্ষা।
@@ -201,6 +203,20 @@ export class OrdersService {
         timeout: 15_000,
       },
     );
+
+    /**
+     * COD ঝুঁকির হিসাব — **transaction শেষ হওয়ার পরে, ইচ্ছাকৃতভাবে**।
+     *
+     * ভেতরে রাখলে হিসাবের কোনো ভুল পুরো অর্ডার rollback করে দিত।
+     * কাস্টমারের টাকা আর ইচ্ছা দুটোই আছে, স্টকও কমে গেছে — শুধু
+     * একটা পরামর্শমূলক সংখ্যা বের করতে গিয়ে সেটা হারানো অর্থহীন।
+     *
+     * `checkOrder` নিজে কখনো throw করে না, তাই এখানে try লাগে না।
+     * স্কোর অর্ডার আটকায় না — শুধু অ্যাডমিনকে দেখে নিতে বলে।
+     */
+    await this.fraud.checkOrder(created.id);
+
+    return created;
   }
 
   list(userId: string): Promise<OrderSummary[]> {

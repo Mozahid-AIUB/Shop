@@ -54,6 +54,12 @@ const DETAIL_SELECT = {
     },
     orderBy: { createdAt: 'asc' },
   },
+  /**
+   * ঝুঁকির হিসাব **কারণসহ** — এই পাতাতেই অ্যাডমিন সিদ্ধান্ত নেয়।
+   * শুধু "৬৫" দেখলে কেউ কিছু করতে পারে না; "আগে ২টা অর্ডার ফেরত
+   * দিয়েছে" দেখলে সে জানে ফোনে কী জিজ্ঞেস করতে হবে।
+   */
+  fraudCheck: { select: { score: true, level: true, reasons: true } },
 } satisfies Prisma.OrderSelect;
 
 const BOARD_SELECT = {
@@ -67,6 +73,14 @@ const BOARD_SELECT = {
   shipDistrict: true,
   createdAt: true,
   items: { select: { id: true }, },
+  /**
+   * COD ঝুঁকি — তালিকাতেই দেখানো হয়, কারণ অ্যাডমিন এখান থেকেই
+   * সিদ্ধান্ত নেয়। আলাদা পাতায় লুকানো থাকলে কেউ দেখত না।
+   *
+   * `reasons` এখানে আনা হয় না — তালিকা ভারী হতো। "কেন" জানতে
+   * অর্ডারের বিস্তারিত পাতায় যেতে হবে।
+   */
+  fraudCheck: { select: { score: true, level: true } },
 } satisfies Prisma.OrderSelect;
 
 export type OrderFullDetail = Prisma.OrderGetPayload<{ select: typeof DETAIL_SELECT }>;
