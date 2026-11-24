@@ -11,8 +11,8 @@ const hindSiliguri = Hind_Siliguri({
 });
 
 export const metadata: Metadata = {
-  title: 'Custom T-Shirt Studio',
-  description: 'নিজের ডিজাইনে কাস্টম টি-শার্ট — ডিজাইন করো, অর্ডার দাও, ট্র্যাক করো',
+  title: 'Shop',
+  description: 'অনলাইন দোকান — পছন্দের পণ্য অর্ডার করো, পেমেন্ট করো, ডেলিভারি পর্যন্ত ট্র্যাক করো',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -218,14 +218,23 @@ describe('RedxProvider', () => {
     });
 
     /**
-     * **`is_closed_box: false`** — ক্রেতা টাকা দেওয়ার আগে পার্সেল
-     * খুলে দেখতে পারবে।
+     * **খুলে দেখতে দেওয়া — অ্যাডমিনের সিদ্ধান্ত, হার্ডকোড নয়।**
      *
-     * `true` দিলে না দেখেই টাকা দিতে হতো, আর বাংলাদেশে সেটা ফেরতের
-     * হার বাড়ায় — ক্রেতা সন্দেহে নিতেই চায় না। খুলে দেখতে দিলে
-     * বিশ্বাস বাড়ে, আর ভুল পণ্য গেলে তখনই ধরা পড়ে।
+     * পণ্যভেদে ঠিক উত্তর আলাদা:
+     *
+     * - মোবাইল/ইলেকট্রনিক্সে **দরকার** — না দেখে কেউ ১৫ হাজার
+     *   টাকা দেয় না
+     * - কাস্টম ছাপা পণ্যে **ক্ষতিকর** — "ডিজাইন পছন্দ হয়নি" বলে
+     *   ফেরত দিলে সেটা আর কাউকে বেচা যায় না
+     * - খাবার/প্রসাধনীতে ক্ষতিকর — সিল ভাঙলে আর বিক্রি হয় না
+     *
+     * এই কোড অন্য ব্যবসায়ীদের কাছেও যাবে, আর তাদের পণ্য আলাদা।
+     * তাই সিদ্ধান্তটা সেটআপে।
+     *
+     * ডিফল্ট **খুলে দেখতে দেওয়া**: বেশিরভাগ দোকানে সেটাই ঠিক, আর
+     * নতুন দোকানে ক্রেতার বিশ্বাসই সবচেয়ে বড় বাধা।
      */
-    it('lets the customer inspect the parcel before paying', async () => {
+    it('lets the customer inspect the parcel by default', async () => {
       const { calls } = stubFetch([areasResponse, parcelResponse]);
 
       await provider.createParcel(parcel, context());
@@ -233,6 +242,17 @@ describe('RedxProvider', () => {
       const body = JSON.parse(String(calls[1]?.init.body)) as { is_closed_box: boolean };
 
       expect(body.is_closed_box).toBe(false);
+    });
+
+    /** অ্যাডমিন বন্ধ করলে সিল করা পার্সেল যায় — কাস্টম বা সিল করা পণ্যে দরকার। */
+    it('sends a closed box when the admin turns inspection off', async () => {
+      const { calls } = stubFetch([areasResponse, parcelResponse]);
+
+      await provider.createParcel(parcel, { ...context(), allowOpenBox: false });
+
+      const body = JSON.parse(String(calls[1]?.init.body)) as { is_closed_box: boolean };
+
+      expect(body.is_closed_box).toBe(true);
     });
 
     /**
