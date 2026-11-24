@@ -12,23 +12,26 @@
 | 06 | Order Lifecycle + Tracking | ✅ শেষ (backend) | `06-order-lifecycle.md` |
 | 07 | Admin Panel (production + audit) | ✅ শেষ (backend) | `07-admin-panel.md` |
 | 08 | Notifications (BullMQ) | ⬜ বাকি | — |
-| 09 | Reports + Analytics | ⬜ বাকি | — |
+| 09 | Reports + Analytics | ✅ শেষ (backend) | `09-reports.md` |
 | 10 | Courier (Steadfast/Pathao/RedX) | ⬜ বাকি | — |
 | 11 | Fraud Guard (COD risk) | ⬜ বাকি | — |
 | 12 | Tracking (Meta Pixel + CAPI) | ⬜ বাকি | — |
 | 13 | Hardening (rate limit, helmet, log) | ✅ শেষ (backend) | `13-hardening.md` |
 
-**এখন কোথায়:** Phase 02-07 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
-Phase 13 (Hardening) **শেষ** — branch `phase/13-hardening`: rate limit
-(login ৫/মিনিট, register ১০/ঘণ্টা, `/track` ১০/মিনিট, গ্লোবাল ১০০/মিনিট;
-`/health` বাদ), helmet + কড়া CSP, pino structured log + `x-request-id`,
-আর সংবেদনশীল ফিল্ড (পাসওয়ার্ড, token, cookie, ফোন) redact।
-**১৭৪টা API টেস্ট (১৩টা suite) সবুজ**, lint ও build পরিষ্কার
+**এখন কোথায়:** Phase 02-07 আর 13 `main`-এ merge ও **GitHub-এ push, CI সবুজ**।
+Phase 09 (Reports) **শেষ** — branch `phase/09-reports`: ৫টা endpoint
+(`summary`, `sales`, `best-sellers`, `status-breakdown`, `repeat-customers`),
+সবগুলো **শুধু `SUPER_ADMIN`**। টাকার তিনটা সংখ্যা আলাদা:
+ordered / collected / due — COD-তে অর্ডার হওয়া আর টাকা পাওয়া এক নয়।
+বাতিল অর্ডার টাকার হিসাবে নেই, কিন্তু status breakdown-এ দেখানো হয়
+(কত হারাচ্ছি সেটা জানা দরকার)। `admin/` ফোল্ডার sub-folder-এ ভাগ করা হয়েছে:
+`production/`, `activity-log/`, `invoice/`, `reports/`।
+**২০৬টা API টেস্ট (১৫টা suite) সবুজ**, lint ও build পরিষ্কার
 (`packages/shared/dist` মুছে CI-র মতো অবস্থা থেকেও যাচাই করা)।
-**পরের কাজ:** Phase 09 — Reports।
+**পরের কাজ:** Phase 11 — Fraud Guard (বাইরের কিছু লাগে না)।
 সিদ্ধান্ত: আগে পুরো backend, UI তারপর।
 **Blocker:** Phase 08-এ Redis নেই, Phase 10-এ কুরিয়ার API key নেই,
-Phase 12-এ Meta token নেই। বাইরের কিছু ছাড়াই এখন করা যায়: **09 আর 11**।
+Phase 12-এ Meta token নেই — ওই তিনটায় তোমার ব্যবস্থা লাগবে।
 
 **Phase 13-এ প্ল্যান থেকে সরানো:** DB backup cron আর VPS deploy (আসল সার্ভার
 লাগবে), Playwright E2E (UI লাগবে) — তিনটাই deploy-এর আগে, আলাদা phase-এ।
@@ -36,15 +39,22 @@ rate limit এখন **মেমরিতে** — এক instance চলছে 
 (Phase 08) throttler storage ওখানে সরাতে হবে, নইলে একাধিক instance-এ
 সীমা আলাদা হিসাব করবে।
 
+**Phase 09-এ ইচ্ছাকৃতভাবে করা হয়নি:** pre-aggregated summary table।
+দুই জায়গায় সত্য রাখলে তারা আলাদা হয়ে যায় — অর্ডার পরে বাতিল হলে বা
+পেমেন্ট void হলে summary row বাসি হয়ে যেত আর রিপোর্ট ভুল সংখ্যা বলত।
+ভুল সংখ্যা সংখ্যা না থাকার চেয়েও খারাপ। query plan দেখে যাচাই করা হয়েছে:
+২ লাখ row-তে `createdAt` index ব্যবহার হয়, ৩০ দিনের window ২১ms-এ আসে।
+**কখন বসাতে হবে:** অর্ডার লাখ ছাড়ালে, বা রিপোর্ট ১ সেকেন্ডের বেশি নিলে।
+
 ## সিদ্ধান্ত — Admin কাঠামো (২৪ নভেম্বর ২০২৬)
 
 - **Permission:** এখনকার ৫টা role-ই থাকবে (`SUPER_ADMIN`, `ORDER_MANAGER`,
   `DESIGNER`, `ACCOUNTANT`, `CUSTOMER`)। প্রতি-কর্মীর আলাদা permission table
   **এখন নয়** — দরকার হলে পরে যোগ হবে। `ORDER_MANAGER` কার্যত moderator।
-- **Admin module ভাগ করা:** Phase 09-এর সাথে। এখন `modules/admin/` ফ্ল্যাট
-  (এক `admin.controller.ts`-এ ৪টা controller)। Reports লেখার সময় sub-folder-এ
-  ভাগ হবে: `production/`, `activity-log/`, `invoice/`, `reports/` — আলাদা
-  refactor commit লাগবে না।
+- **Admin module ভাগ করা:** ✅ হয়ে গেছে (Phase 09-এর সাথে)।
+  `modules/admin/` এখন: `production/`, `activity-log/`, `invoice/`,
+  `reports/` — প্রতিটায় নিজের controller + service। আগের এক
+  `admin.controller.ts`-এ ৪টা controller গাদাগাদি করা অবস্থা আর নেই।
 
 **Phase 07-এ প্ল্যান থেকে সরানো:** ফাইল আপলোড (print-ready design) — MinIO
 বসার পর Phase 08-এর সাথে হবে। আপলোড পুরো প্রোডাক্টের সবচেয়ে ঝুঁকিপূর্ণ জায়গা

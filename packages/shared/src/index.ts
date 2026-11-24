@@ -9,3 +9,4 @@ export * from './schemas/catalog';
 export * from './schemas/order';
 export * from './schemas/payment';
 export * from './schemas/production';
+export * from './schemas/report';

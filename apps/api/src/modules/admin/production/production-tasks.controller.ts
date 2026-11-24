@@ -1,22 +1,18 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import {
-  activityLogQuerySchema,
   assignTaskSchema,
   createTaskSchema,
   taskListQuerySchema,
   updateTaskSchema,
   type AccessTokenPayload,
-  type ActivityLogQuery,
   type AssignTaskInput,
   type CreateTaskInput,
   type TaskListQuery,
   type UpdateTaskInput,
 } from '@shop/shared';
-import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { ActivityLogService, type ActivityLogPage } from './activity-log.service';
-import { InvoiceService, type InvoiceView } from './invoice.service';
+import { ZodValidationPipe } from '../../../common/pipes/zod-validation.pipe';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
+import { Roles } from '../../auth/decorators/roles.decorator';
 import { ProductionTasksService, type TaskPage, type TaskRow } from './production-tasks.service';
 
 /**
@@ -73,39 +69,5 @@ export class TaskManagementController {
     @Body(new ZodValidationPipe(assignTaskSchema)) body: AssignTaskInput,
   ): Promise<TaskRow> {
     return this.tasks.assign(id, body, { id: user.sub, role: user.role });
-  }
-}
-
-/**
- * অডিট লগ — **শুধু `SUPER_ADMIN`**।
- *
- * লগে কে কখন কী করেছে লেখা থাকে, অর্থাৎ এটা কর্মীদের উপর
- * নজরদারির তথ্য। ম্যানেজারকেও দেওয়া হয়নি।
- *
- * মোছার কোনো endpoint নেই, আর থাকবেও না — অডিট ট্রেইল মোছা গেলে
- * সেটা আর অডিট নয়।
- */
-@Roles('SUPER_ADMIN')
-@Controller('admin/activity')
-export class ActivityLogController {
-  constructor(private readonly activity: ActivityLogService) {}
-
-  @Get()
-  list(
-    @Query(new ZodValidationPipe(activityLogQuerySchema)) query: ActivityLogQuery,
-  ): Promise<ActivityLogPage> {
-    return this.activity.list(query);
-  }
-}
-
-/** ইনভয়েসের ডেটা — ACCOUNTANT-ও লাগবে, সে-ই বিল নিয়ে কাজ করে। */
-@Roles('SUPER_ADMIN', 'ORDER_MANAGER', 'ACCOUNTANT')
-@Controller('admin/orders')
-export class InvoiceController {
-  constructor(private readonly invoices: InvoiceService) {}
-
-  @Get(':orderNumber/invoice')
-  build(@Param('orderNumber') orderNumber: string): Promise<InvoiceView> {
-    return this.invoices.build(orderNumber);
   }
 }

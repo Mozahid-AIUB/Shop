@@ -97,10 +97,10 @@
 
 ## Phase 09 — Reports
 
-- [ ] 9.1 Sales aggregate query (date range)
-- [ ] 9.2 Best seller, status breakdown, revenue vs due
-- [ ] 9.3 Repeat customer
-- [ ] 9.4 **টেস্ট:** বড় ডেটায় query slow নয় (index আছে)
+- [x] 9.1 Sales aggregate query (date range)
+- [x] 9.2 Best seller, status breakdown, revenue vs due
+- [x] 9.3 Repeat customer
+- [x] 9.4 **টেস্ট:** বড় ডেটায় query slow নয় (index আছে)
 
 ---
 
