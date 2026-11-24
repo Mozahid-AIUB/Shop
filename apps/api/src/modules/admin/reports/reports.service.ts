@@ -102,12 +102,23 @@ export class ReportsService {
      * পড়ত — আর সার্ভার প্রায় সবসময় UTC (CI, VPS, Docker)। তখন
      * ঢাকার ভোর ৫টার অর্ডার আগের দিনে দেখাতো। স্ট্রিং করে আনলে
      * মাঝখানে টাইমজোন ঢোকার পথই থাকে না।
+     *
+     * **দুই ধাপের রূপান্তর কেন:** `createdAt` হলো
+     * `timestamp without time zone`, অর্থাৎ ভেতরে টাইমজোনের কোনো
+     * তথ্য নেই। Prisma সেখানে **UTC** লেখে। তাই আগে
+     * `AT TIME ZONE 'UTC'` দিয়ে বলতে হয় "এটা UTC-র পাঠ", তারপর
+     * `AT TIME ZONE 'Asia/Dhaka'` দিয়ে ঢাকায় আনা হয়।
+     *
+     * শুধু একবার `AT TIME ZONE 'Asia/Dhaka'` দিলে ফল **DB-র নিজের
+     * timezone সেটিংয়ের উপর** নির্ভর করত — এই মেশিনে Asia/Dhaka,
+     * CI-র container-এ UTC, তাই একই ডেটায় দুই রকম উত্তর আসত
+     * (সত্যিই এসেছিল, CI তিনবার ভেঙেছে)।
      */
     const rows = await this.prisma.$queryRaw<
       { date: string; order_count: bigint; ordered_paisa: bigint | null }[]
     >`
       SELECT
-        to_char("createdAt" AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD') AS date,
+        to_char("createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD') AS date,
         COUNT(*) AS order_count,
         SUM("totalPaisa") AS ordered_paisa
       FROM orders
