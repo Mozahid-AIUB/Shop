@@ -49,6 +49,9 @@ model User {
   /// কোন কুপন কতবার নিয়েছে — প্রতি-ইউজার সীমা এখান থেকে গোনা হয়
   couponRedemptions CouponRedemption[]
 
+  /// এই ক্রেতার লেখা রিভিউ
+  reviews Review[]
+
   @@index([role])
   @@map("users")
 }
@@ -111,6 +114,7 @@ model Product {
   variants   ProductVariant[]
   images     ProductImage[]
   attributes ProductAttribute[]
+  reviews    Review[]
 
   /// storefront-এর প্রধান দুই query: ক্যাটাগরিভিত্তিক তালিকা আর নতুন পণ্য
   @@index([categoryId, isPublished])
@@ -366,6 +370,8 @@ model OrderItem {
 
   order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  /// এই আইটেমের রিভিউ — এক আইটেমে একটাই
+  review  Review?
 
   @@index([orderId])
   @@map("order_items")
@@ -674,7 +680,7 @@ model CouponRedemption {
   userId   String?
   /// এক অর্ডারে একটাই কুপন — তাই `@unique`। এটাই race-এর আসল রক্ষা:
   /// একই অর্ডারে দুবার লেখার চেষ্টা DB-তেই আটকে যায়
-  orderId  String @unique
+  orderId  String  @unique
 
   /// কত ছাড় পেল — পরে কুপনের মান বদলালেও এই অর্ডারের ইতিহাস ঠিক থাকে
   discountPaisa         Int
@@ -731,13 +737,11 @@ model CourierAccount {
 
   /**
    * credential, **এনক্রিপ্ট করা JSON**।
-   *
    * আলাদা কলাম নয় ইচ্ছাকৃতভাবে: চারটা কুরিয়ারের মাঠ একেবারে
    * আলাদা। Steadfast-এ api-key + secret-key, Pathao-তে OAuth-র
    * চারটা মান, RedX-এ একটা JWT, Carrybee-তে client id + secret +
    * context। আলাদা কলাম রাখলে অর্ধেক কলাম সবসময় `null` থাকত আর
    * নতুন কুরিয়ার যোগ করতে migration লাগত।
-   *
    * `null` = এখনো key বসানো হয়নি (`MANUAL`-এ কখনো লাগে না)।
    */
   credentials String?
@@ -777,26 +781,21 @@ model CourierAccount {
 
   /**
    * webhook যাচাইয়ের গোপন মান, **এনক্রিপ্ট করা**।
-   *
    * ছাড়া webhook খোলা দরজা: যে কেউ "DELIVERED" পাঠিয়ে অর্ডার
    * ডেলিভারড দেখাত, আর COD-র টাকা না পেয়েই হিসাব মিলে যেত।
    */
   webhookSecret String?
   /**
    * OAuth টোকেন, **এনক্রিপ্ট করা JSON** — Pathao-র মতো কুরিয়ারের জন্য।
-   *
    * Pathao প্রতিটা কলে static key নেয় না; আগে টোকেন ইস্যু করতে হয়,
    * আর সেটার মেয়াদ ৫ দিন। প্রতিবার নতুন টোকেন চাইলে তাদের rate
    * limit-এ পড়তাম, আর মেমরিতে রাখলে সার্ভার রিস্টার্টেই হারাত —
    * একাধিক সার্ভার চালালে প্রত্যেকে আলাদা টোকেন নিত।
-   *
    * আকার: `{ accessToken, refreshToken, expiresAt }`।
-   *
    * **key-র মতোই এনক্রিপ্টেড**, কারণ টোকেন হাতে পেলে key-র মতোই
    * কাজ করা যায় — মেয়াদ শেষ হওয়া পর্যন্ত।
    */
-  oauthToken String?
-
+  oauthToken    String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -820,7 +819,6 @@ model Shipment {
 
   /**
    * কুরিয়ারের দেওয়া আইডি। `null` = এখনো পাঠানো হয়নি বা `MANUAL`।
-   *
    * `@unique` নয়: দুই কুরিয়ারের নম্বর মিলে যেতে পারে, আর তখন
    * দ্বিতীয় পার্সেল তৈরিই হতো না। মিল ঠেকাতে
    * `@@unique([courier, consignmentId])` ব্যবহার হয়।
@@ -846,19 +844,18 @@ model Shipment {
 
   /**
    * কুরিয়ারে পাঠানোর শেষ চেষ্টার ত্রুটি।
-   *
    * রাখা হয় কারণ ব্যর্থতাটা সাধারণত key বা ঠিকানার সমস্যা, আর
    * অ্যাডমিন সেটা না দেখলে শুধু "কাজ করছে না" বলতে পারত।
    */
   lastError String?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   dispatchedAt DateTime?
   deliveredAt  DateTime?
 
-  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  account CourierAccount @relation(fields: [courierAccountId], references: [id])
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  account CourierAccount  @relation(fields: [courierAccountId], references: [id])
   events  ShipmentEvent[]
 
   /// একই কুরিয়ারে একই নম্বর দুবার নয় — duplicate webhook-এর রক্ষা
@@ -895,4 +892,66 @@ model ShipmentEvent {
   @@unique([shipmentId, status, occurredAt])
   @@index([shipmentId, createdAt])
   @@map("shipment_events")
+}
+
+/**
+ * পণ্যের রিভিউ ও রেটিং (Phase 17)।
+ * **কেন `orderItemId` অদ্বিতীয়:** ভুয়া রিভিউর সবচেয়ে সহজ পথ হলো
+ * একই লোক বারবার ৫ তারা দেওয়া। রিভিউকে **যা সে সত্যিই কিনেছে**
+ * তার সাথে এক-এক করে বেঁধে দিলে সেই পথ বন্ধ — ১০টা রিভিউ লিখতে
+ * ১০বার কিনতে হবে।
+ * **কেন `productId` আলাদা রাখা, `orderItem.variant` ধরে না গিয়ে:**
+ * `OrderItem.variantId` মুছে গেলে `null` হয়ে যায় (`SetNull`), কারণ
+ * পুরোনো অর্ডারের ইতিহাস variant মুছলেও থাকা দরকার। কিন্তু রিভিউ
+ * variant-এর নয়, **পণ্যের** — দোকানি সাইজ বা রং বন্ধ করে দিলে
+ * ক্রেতার লেখা রিভিউ হারিয়ে যাওয়া চলবে না। তাই লেখার সময় পণ্যটা
+ * এখানে কপি হয়ে যায়।
+ * **কেন গড় রেটিং এখানে জমানো হয় না:** রিভিউ অনুমোদন বদলালে বা মুছে
+ * গেলে জমানো সংখ্যা বাসি হতো, আর বাসি রেটিং ভুল রেটিংয়ের চেয়ে খারাপ
+ * (কেউ টের পায় না)। তাই গড় সবসময় হিসাব করে নেওয়া হয়।
+ */
+model Review {
+  id        String @id @default(cuid())
+  productId String
+  userId    String
+
+  /**
+   * কোন অর্ডার-আইটেমের জন্য।
+   * `onDelete: Cascade` — অর্ডার মুছলে রিভিউও যাবে। প্রমাণ ছাড়া
+   * রিভিউ রেখে দিলে পরে যাচাই করার উপায় থাকত না।
+   */
+  orderItemId String @unique
+
+  /// ১ থেকে ৫ — schema-তেও যাচাই হয় (`reviewInputSchema`)
+  rating Int
+  /// শিরোনাম বাধ্যতামূলক নয় — অনেকে শুধু তারা দিয়েই চলে যায়
+  title  String?
+  body   String?
+
+  /**
+   * অ্যাডমিন অনুমোদন করেছে কি না।
+   * ডিফল্ট `false`, অর্থাৎ **নতুন রিভিউ সাইটে দেখা যায় না**। গালি,
+   * স্প্যাম বা প্রতিযোগীর কুৎসা সরাসরি পণ্যের পাতায় বসে গেলে সরানোর
+   * আগেই ক্ষতি হয়ে যেত।
+   */
+  isApproved Boolean @default(false)
+
+  /// দোকানের জবাব — খারাপ রিভিউর উত্তর দেওয়া ব্যবসার দরকার
+  adminReply   String?
+  adminReplyAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product   Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  /// পণ্যের পাতায় অনুমোদিত রিভিউ, নতুন আগে — storefront-এর প্রধান query
+  @@index([productId, isApproved, createdAt])
+  /// অ্যাডমিনের "অনুমোদনের অপেক্ষায়" তালিকা
+  @@index([isApproved, createdAt])
+  /// "আমার রিভিউ" আর দুবার লেখা আটকানো
+  @@index([userId, createdAt])
+  @@map("reviews")
 }

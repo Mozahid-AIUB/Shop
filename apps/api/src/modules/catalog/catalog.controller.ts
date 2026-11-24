@@ -9,7 +9,11 @@ import {
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Public } from '../auth/decorators/public.decorator';
 import { CategoriesService, type CategoryNode } from './categories.service';
-import { ProductsService, type ProductDetail, type ProductListResult } from './products.service';
+import {
+  ProductsService,
+  type ProductListResult,
+  type PublicProductDetail,
+} from './products.service';
 import { SearchService, type SearchItem } from './search.service';
 
 /**
@@ -46,7 +50,7 @@ export class CatalogController {
 
   @Public()
   @Get('products/:slug')
-  detail(@Param('slug') slug: string): Promise<ProductDetail> {
+  detail(@Param('slug') slug: string): Promise<PublicProductDetail> {
     return this.products.findPublishedBySlug(slug);
   }
 

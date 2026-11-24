@@ -7,66 +7,29 @@ import { Prisma } from '@prisma/client';
 import {
   escapeLikePattern,
   type CreateProductInput,
+  type RatingSummary,
   type ProductListQuery,
   type UpdateProductInput,
   type UpdateStockInput,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
-
-/**
- * তালিকার কার্ড — নাম, দাম, একটা ছবি। পুরো variant সেট নয়।
- * `include` দিলে প্রতি প্রোডাক্টে আলাদা query হতো (N+1); `select` দিয়ে
- * শুধু সস্তা অংশটুকু একবারে আসে।
- */
-const LIST_SELECT = {
-  id: true,
-  name: true,
-  slug: true,
-  createdAt: true,
-  category: { select: { id: true, name: true, slug: true } },
-  images: {
-    select: { url: true, alt: true },
-    orderBy: { sortOrder: 'asc' },
-    take: 1,
-  },
-  variants: {
-    where: { isActive: true },
-    select: { pricePaisa: true, comparePricePaisa: true, stock: true },
-    orderBy: { pricePaisa: 'asc' },
-  },
-} satisfies Prisma.ProductSelect;
-
-/** একক প্রোডাক্টের পাতায় সবকিছুই লাগে। */
-const DETAIL_SELECT = {
-  id: true,
-  name: true,
-  slug: true,
-  description: true,
-  isPublished: true,
-  createdAt: true,
-  category: { select: { id: true, name: true, slug: true } },
-  images: {
-    select: { id: true, url: true, alt: true, sortOrder: true },
-    orderBy: { sortOrder: 'asc' },
-  },
-  attributes: { select: { id: true, name: true, value: true } },
-  variants: {
-    select: {
-      id: true,
-      sku: true,
-      pricePaisa: true,
-      comparePricePaisa: true,
-      stock: true,
-      isActive: true,
-      options: { select: { id: true, name: true, value: true } },
-    },
-    orderBy: { pricePaisa: 'asc' },
-  },
-} satisfies Prisma.ProductSelect;
+import { ReviewService } from '../reviews/review.service';
+import {
+  DETAIL_SELECT,
+  LIST_SELECT,
+  type ProductCardRow,
+  type ProductDetail,
+  type ProductListResult,
+  type PublicProductDetail,
+  type StockResult,
+} from './product-views';
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reviews: ReviewService,
+  ) {}
 
   /**
    * Public তালিকা। Cursor pagination — `skip`/`take` নয়, কারণ বড় offset-এ
@@ -84,8 +47,14 @@ export class ProductsService {
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;
 
+    /**
+     * রেটিং এক query-তে সবগুলোর — প্রতি পণ্যে আলাদা ডাকলে ২৪টা
+     * পণ্যের পাতায় ২৪টা query হতো (N+1)।
+     */
+    const ratings = await this.reviews.summariesFor(page.map((row) => row.id));
+
     return {
-      items: page.map((row) => this.toCard(row)),
+      items: page.map((row) => this.toCard(row, ratings)),
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
   }
@@ -141,7 +110,7 @@ export class ProductsService {
   }
 
   /** Public detail — খসড়া প্রোডাক্ট slug জানা থাকলেও দেখা যাবে না। */
-  async findPublishedBySlug(slug: string): Promise<ProductDetail> {
+  async findPublishedBySlug(slug: string): Promise<PublicProductDetail> {
     const product = await this.prisma.product.findFirst({
       where: { slug, isPublished: true },
       select: DETAIL_SELECT,
@@ -151,7 +120,11 @@ export class ProductsService {
       throw new NotFoundException('Product not found');
     }
 
-    return { ...product, variants: product.variants.filter((v) => v.isActive) };
+    return {
+      ...product,
+      variants: product.variants.filter((v) => v.isActive),
+      rating: await this.reviews.summaryFor(product.id),
+    };
   }
 
   /** Admin detail — খসড়াও দেখা যায়। */
@@ -415,9 +388,13 @@ export class ProductsService {
   }
 
   /** তালিকার কার্ড — list আর search দুই পথেই এক চেহারা। */
-  private toCard(row: ProductCardRow): ProductListResult['items'][number] {
+  private toCard(
+    row: ProductCardRow,
+    ratings: Map<string, RatingSummary>,
+  ): ProductListResult['items'][number] {
     return {
       id: row.id,
+      rating: ratings.get(row.id) ?? { average: null, count: 0, breakdown: {} },
       name: row.name,
       slug: row.slug,
       category: row.category,
@@ -449,26 +426,11 @@ export class ProductsService {
   }
 }
 
-export interface ProductListResult {
-  items: {
-    id: string;
-    name: string;
-    slug: string;
-    category: { id: string; name: string; slug: string };
-    image: { url: string; alt: string | null } | null;
-    fromPricePaisa: number | null;
-    comparePricePaisa: number | null;
-    inStock: boolean;
-  }[];
-  nextCursor: string | null;
-}
-
-export type ProductDetail = Prisma.ProductGetPayload<{ select: typeof DETAIL_SELECT }>;
-
-type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof LIST_SELECT }>;
-
-export interface StockResult {
-  id: string;
-  sku: string;
-  stock: number;
-}
+/** টাইপগুলো `product-views.ts`-এ; এখান থেকেও পাওয়া যায় যাতে ডাকার জায়গা বদলাতে না হয়। */
+export type {
+  ProductCardRow,
+  ProductDetail,
+  ProductListResult,
+  PublicProductDetail,
+  StockResult,
+};
