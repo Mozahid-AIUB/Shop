@@ -3,6 +3,7 @@ import type { Courier } from '@shop/shared';
 import type { CourierProvider } from './courier.provider';
 import { ManualProvider } from './providers/manual.provider';
 import { PathaoProvider } from './providers/pathao.provider';
+import { RedxProvider } from './providers/redx.provider';
 import { SteadfastProvider } from './providers/steadfast.provider';
 
 /**
@@ -28,11 +29,13 @@ export class CourierRegistry {
     manual: ManualProvider,
     steadfast: SteadfastProvider,
     pathao: PathaoProvider,
+    redx: RedxProvider,
   ) {
     this.providers = new Map<Courier, CourierProvider>([
       [manual.kind, manual],
       [steadfast.kind, steadfast],
       [pathao.kind, pathao],
+      [redx.kind, redx],
     ]);
   }
 

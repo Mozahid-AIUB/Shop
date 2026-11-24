@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { Shipment } from '@prisma/client';
@@ -163,6 +164,7 @@ export class CourierWebhookController {
     @Param('courier') courierParam: string,
     @Body() body: unknown,
     @Headers() headers: Record<string, string | string[] | undefined>,
+    @Query('token') queryToken?: string,
   ): Promise<{ received: boolean }> {
     const kind = COURIERS.find((name) => name.toLowerCase() === courierParam.toLowerCase());
 
@@ -187,7 +189,19 @@ export class CourierWebhookController {
       );
     }
 
-    const update = this.registry.get(kind).parseWebhook(body, headers, found.webhookSecret);
+    /**
+     * query-র token header-এর মতো করে পাস করা হয়।
+     *
+     * **কেন:** RedX signature পাঠায় না — তাদের ডকে লেখা, credential
+     * **query parameter**-এ আসে (`?token=xxx`)। adapter-কে express-এর
+     * request object দিলে প্রতিটা adapter framework-এর সাথে বাঁধা
+     * পড়ত আর টেস্ট করা কঠিন হতো। নাম `x-query-token` রাখা হয়েছে
+     * যাতে আসল header-এর সাথে কখনো মিলে না যায়।
+     */
+    const withQuery: Record<string, string | string[] | undefined> =
+      queryToken === undefined ? headers : { ...headers, 'x-query-token': queryToken };
+
+    const update = this.registry.get(kind).parseWebhook(body, withQuery, found.webhookSecret);
 
     if (update === null) {
       /**

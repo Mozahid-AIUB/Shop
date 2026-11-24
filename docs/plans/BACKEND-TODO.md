@@ -129,7 +129,7 @@
 
 - [x] 10.9 Steadfast adapter — **মালিকের merchant API guide ধরে লেখা**
 - [x] 10.10 Pathao adapter — **তাদের developer documentation ধরে** (OAuth, টোকেন DB-তে এনক্রিপ্টেড)
-- [ ] 10.11 RedX adapter — **ডক পাওয়া গেছে**, লেখা বাকি
+- [x] 10.11 RedX adapter — **তাদের OpenAPI documentation ধরে** (এরিয়া lookup + query-token webhook + বাতিল)
 - [ ] ~~10.12 Carrybee adapter~~ — **মালিকের সিদ্ধান্তে বাদ**, ডকও পাওয়া যায়নি
 - [x] 10.13 পণ্যে ওজনের ঘর (গ্রামে) + কুরিয়ার সেটআপে ডিফল্ট ওজন
 

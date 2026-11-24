@@ -10,6 +10,7 @@ import { CourierRegistry } from './courier.registry';
 import { CourierService } from './courier.service';
 import { ManualProvider } from './providers/manual.provider';
 import { PathaoProvider } from './providers/pathao.provider';
+import { RedxProvider } from './providers/redx.provider';
 import { SteadfastProvider } from './providers/steadfast.provider';
 
 /**
@@ -30,6 +31,7 @@ import { SteadfastProvider } from './providers/steadfast.provider';
     ManualProvider,
     SteadfastProvider,
     PathaoProvider,
+    RedxProvider,
     CourierRegistry,
     CourierAccountService,
     CourierService,
