@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test:cov": "jest --coverage --runInBand"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -89,6 +90,20 @@
     "setupFiles": [
       "<rootDir>/test/jest-setup.ts"
     ],
-    "maxWorkers": 1
+    "maxWorkers": 1,
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "main.ts",
+      "\\.module\\.ts$",
+      "prisma/seed.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 80,
+        "branches": 60,
+        "functions": 80,
+        "lines": 80
+      }
+    }
   }
 }

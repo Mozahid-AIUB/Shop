@@ -57,6 +57,17 @@ jobs:
 
       - run: npm run lint
 
-      - run: npm run test
+      # `test:cov` টেস্টও চালায়, সাথে coverage-এর সীমাও যাচাই করে।
+      # দুটো আলাদা step রাখলে একই suite দুবার চলত।
+      # সীমা নিচে নামলে এখানেই ভাঙবে — `apps/api/package.json`-এ
+      # `coverageThreshold` দেখো।
+      - name: Test with coverage thresholds
+        run: npm run test:cov -w @shop/api
+
+      # web-এর নিজের টেস্ট আলাদা (api-র jest config ওগুলো ধরে না)।
+      # `test:web` ব্যবহার করতে হয়, `-w @shop/web` নয় — Windows-এ
+      # drive letter-এর কারণে vitest সরাসরি চালালে ভাঙে
+      # (দেখো: `scripts/run-web-tests.mjs`)
+      - run: npm run test:web
 
       - run: npm run build

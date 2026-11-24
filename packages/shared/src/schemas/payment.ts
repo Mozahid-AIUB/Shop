@@ -3,7 +3,6 @@ import { paisaSchema } from './catalog';
 import {
   PAYMENT_METHODS,
   requiresReference,
-  type PaymentMethod,
   type PaymentRecordStatus,
 } from '../constants/payment';
 

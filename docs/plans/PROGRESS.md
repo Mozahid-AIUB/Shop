@@ -152,3 +152,28 @@ courier/
   (`to_char(... AT TIME ZONE 'Asia/Dhaka', 'YYYY-MM-DD')`), আর
   `main.ts` ও `jest-setup.ts`-এ `TZ=Asia/Dhaka` বাঁধা আছে।
   সন্দেহ হলে `TZ=UTC npm run test -w @shop/api` চালিয়ে দেখো
+- **web-এর টেস্ট `npm run test:web` দিয়ে চালাও**, `npm run test -w @shop/web`
+  দিয়ে নয়। Windows-এ npm workspace ছোট হাতের drive letter দেয় (`d:/…`),
+  Vite তখন `d:/` আর `D:/` আলাদা ধরে নিজের runtime দুবার লোড করে আর
+  `describe` undefined হয়ে যায় — টেস্ট ভাঙা মনে হয়, আসলে পথের সমস্যা
+  (দেখো: `scripts/run-web-tests.mjs`)
+
+## কোডের গুণমান — কী কী স্বয়ংক্রিয়ভাবে যাচাই হয়
+
+| যাচাই | কোথায় | সীমা |
+|---|---|---|
+| TypeScript strict | তিন প্যাকেজেই | `noUncheckedIndexedAccess` সহ |
+| `any` নিষেধ | eslint | error |
+| কোড জটিলতা | eslint | `complexity` ১২, `max-depth` ৪ |
+| ফাইল/ফাংশনের দৈর্ঘ্য | eslint | ৩৫০ / ৯০ লাইন (কমেন্ট বাদে) |
+| প্যারামিটার সংখ্যা | eslint | ৫ |
+| টেস্ট coverage | jest threshold | ৮০% statement, ৬০% branch |
+
+**এখনকার coverage:** statement ৮৬%, branch ৬৮%, function ৮৭%।
+সীমা তার একটু নিচে বসানো — আজকের কোড পাস করে, কিন্তু **অবনতি হলে
+CI ভাঙবে**। সীমা বাড়াতে চাইলে `apps/api/package.json`-এর
+`coverageThreshold`।
+
+`packages/shared`-এ **আগে lint ছিল না** (api আর web-এর ছিল)। যোগ করার
+পর প্রথম চালাতেই একটা অব্যবহৃত import ধরা পড়েছে। এখানেই টাকার হিসাব
+আর ঝুঁকির স্কোর, তাই এটাই সবচেয়ে জরুরি জায়গা ছিল।
