@@ -513,3 +513,41 @@ model FraudCheck {
   @@index([level, createdAt])
   @@map("fraud_checks")
 }
+
+/// ডেলিভারি চার্জের এলাকা।
+///
+/// **কেন DB-তে, কোডে নয়:** এই কোড অন্য ব্যবসায়ীদের কাছে বিক্রি হবে।
+/// প্রত্যেকের চার্জ, এলাকা আর ফ্রি ডেলিভারির সীমা আলাদা — কোডে
+/// লিখলে প্রতিবার deploy লাগত।
+model ShippingZone {
+  id   String @id @default(cuid())
+  /// "ঢাকা সিটি", "ঢাকার বাইরে" — কার্টে এই নামটাই দেখানো হয়
+  name String
+
+  /// কোন জেলাগুলো এই zone-এ। `Order.shipDistrict`-এর সাথে মেলানো হয়
+  /// (ছোট-বড় হাতের পার্থক্য উপেক্ষা করে)।
+  ///
+  /// আলাদা table নয় কারণ ৬৪ জেলা স্থির, আর প্রতি quote-এ একটা join
+  /// বাঁচে। নতুন এলাকা যোগ করতে শুধু এই array-তে নাম বসালেই হয়।
+  districts String[]
+
+  chargePaisa Int
+
+  /// এই অঙ্কের সমান বা বেশি হলে ফ্রি। `null` মানে এই zone-এ কখনো ফ্রি নয়।
+  /// zone-ভিত্তিক, কারণ ঢাকায় ১০০০+ ফ্রি দেওয়া যায়, বাইরে যায় না।
+  freeAbovePaisa Int?
+
+  /// কোনো জেলা না মিললে এই zone। **ঠিক একটা zone-এ `true` থাকতে হবে** —
+  /// নইলে নতুন জেলার ক্রেতা শূন্য চার্জে ডেলিভারি পেয়ে যেত।
+  /// `shipping.service.ts` এটা যাচাই করে।
+  isDefault Boolean @default(false)
+
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("shipping_zones")
+}

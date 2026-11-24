@@ -31,7 +31,16 @@ describe('Reports', () => {
   const productSlug = `rp-item-${stamp}`;
   const UNIT_PRICE_PAISA = 50_000; // ৫০০ টাকা
   const QUANTITY = 2;
-  const ORDER_TOTAL_PAISA = UNIT_PRICE_PAISA * QUANTITY;
+  /** পণ্যের দাম — best seller-এর আয় এই অঙ্কে গোনা হয় (শিপিং বাদে)। */
+  const LINE_TOTAL_PAISA = UNIT_PRICE_PAISA * QUANTITY;
+
+  /**
+   * অর্ডারের মোট = পণ্য + ডেলিভারি চার্জ (Phase 14)।
+   *
+   * চার্জ DB-র নিয়ম থেকে আসে আর অ্যাডমিন বদলাতে পারে, তাই এখানে
+   * স্থির অঙ্ক লেখা হয় না — প্রথম অর্ডার তৈরির পর সেটা থেকেই পড়া হয়।
+   */
+  let orderTotalPaisa = 0;
 
   let variantId = '';
   let paidOrderNumber = '';
@@ -88,6 +97,8 @@ describe('Reports', () => {
         },
       })
       .expect(201);
+
+    orderTotalPaisa = order.body.totalPaisa;
 
     return order.body.orderNumber;
   };
@@ -191,10 +202,10 @@ describe('Reports', () => {
       const after = await summaryNow();
 
       expect(after.orderCount).toBe(before.orderCount + 1);
-      expect(after.orderedPaisa).toBe(before.orderedPaisa + ORDER_TOTAL_PAISA);
+      expect(after.orderedPaisa).toBe(before.orderedPaisa + orderTotalPaisa);
       // টাকা এখনো আসেনি — শুধু অর্ডার হয়েছে
       expect(after.collectedPaisa).toBe(before.collectedPaisa);
-      expect(after.duePaisa).toBe(before.duePaisa + ORDER_TOTAL_PAISA);
+      expect(after.duePaisa).toBe(before.duePaisa + orderTotalPaisa);
     });
 
     it('moves money from due to collected when payment is recorded', async () => {
@@ -203,15 +214,15 @@ describe('Reports', () => {
       await request(app.getHttpServer())
         .post(`/admin/orders/${paidOrderNumber}/payments`)
         .set(authed(adminToken))
-        .send({ amountPaisa: ORDER_TOTAL_PAISA, method: 'COD' })
+        .send({ amountPaisa: orderTotalPaisa, method: 'COD' })
         .expect(201);
 
       const after = await summaryNow();
 
       // অর্ডারের মোট বদলায়নি — শুধু টাকা হাতে এসেছে
       expect(after.orderedPaisa).toBe(before.orderedPaisa);
-      expect(after.collectedPaisa).toBe(before.collectedPaisa + ORDER_TOTAL_PAISA);
-      expect(after.duePaisa).toBe(before.duePaisa - ORDER_TOTAL_PAISA);
+      expect(after.collectedPaisa).toBe(before.collectedPaisa + orderTotalPaisa);
+      expect(after.duePaisa).toBe(before.duePaisa - orderTotalPaisa);
     });
 
     /**
@@ -232,7 +243,7 @@ describe('Reports', () => {
       const afterCancel = await summaryNow();
 
       expect(afterCancel.orderCount).toBe(withOrder.orderCount - 1);
-      expect(afterCancel.orderedPaisa).toBe(withOrder.orderedPaisa - ORDER_TOTAL_PAISA);
+      expect(afterCancel.orderedPaisa).toBe(withOrder.orderedPaisa - orderTotalPaisa);
     });
 
     it('never reports a negative due', async () => {
@@ -316,7 +327,7 @@ describe('Reports', () => {
       expect(ours).toBeDefined();
       // একটা অর্ডার গোনায় আছে, বাতিলটা নেই
       expect(ours.quantitySold).toBe(QUANTITY);
-      expect(ours.revenuePaisa).toBe(ORDER_TOTAL_PAISA);
+      expect(ours.revenuePaisa).toBe(LINE_TOTAL_PAISA);
       expect(ours.productName).toBe('Reports Item');
     });
 
@@ -387,7 +398,7 @@ describe('Reports', () => {
 
       expect(ours).toBeDefined();
       expect(ours.orderCount).toBe(2);
-      expect(ours.totalSpentPaisa).toBe(ORDER_TOTAL_PAISA * 2);
+      expect(ours.totalSpentPaisa).toBe(orderTotalPaisa * 2);
     });
   });
 });

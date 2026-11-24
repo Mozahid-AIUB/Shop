@@ -344,7 +344,20 @@ describe('Cart and checkout', () => {
       expect(response.body.status).toBe('PENDING');
       expect(response.body.paymentStatus).toBe('UNPAID');
       expect(response.body.subtotalPaisa).toBe(UNIT_PRICE_PAISA * orderedQuantity);
-      expect(response.body.totalPaisa).toBe(UNIT_PRICE_PAISA * orderedQuantity);
+
+      /**
+       * মোট = subtotal + ডেলিভারি − ছাড় (Phase 14 থেকে শিপিং আসল)।
+       *
+       * নির্দিষ্ট অঙ্ক না লিখে সম্পর্কটা যাচাই করা হয়: অ্যাডমিন
+       * চার্জ বদলালে টেস্ট ভাঙবে না, কিন্তু হিসাবের ভুল ধরা পড়বে।
+       */
+      expect(response.body.totalPaisa).toBe(
+        response.body.subtotalPaisa +
+          response.body.shippingPaisa -
+          response.body.discountPaisa,
+      );
+      // ঢাকার ঠিকানা, তাই চার্জ বসেছে — আগে হার্ডকোড ০ ছিল
+      expect(response.body.shippingPaisa).toBeGreaterThan(0);
 
       // ঠিকানার স্ন্যাপশট — পরে ঠিকানা বদলালেও অর্ডার অবিকৃত থাকবে
       expect(response.body.shipFullName).toBe('Buyer Name');

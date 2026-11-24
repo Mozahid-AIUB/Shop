@@ -159,6 +159,53 @@ async function seedCatalog(prisma: PrismaClient): Promise<void> {
 
   const count = await prisma.product.count({ where: { isPublished: true } });
   console.log(`Catalog ready: ${count} published products`);
+
+  await seedShippingZones(prisma);
+}
+
+/**
+ * ডেলিভারি চার্জের এলাকা।
+ *
+ * **অন্তত একটা `isDefault` zone থাকতেই হবে**, নইলে অচেনা জেলার
+ * ক্রেতার জন্য চার্জ বের করা যায় না আর checkout ভেঙে পড়ে। তাই
+ * seed-এ "ঢাকার বাইরে"-কে default রাখা হয়।
+ *
+ * অঙ্কগুলো বাংলাদেশের চলতি হার ধরে — যে কোড ব্যবহার করবে সে
+ * অ্যাডমিন প্যানেল থেকে নিজের মতো বদলে নেবে।
+ */
+async function seedShippingZones(prisma: PrismaClient): Promise<void> {
+  const existing = await prisma.shippingZone.count();
+
+  // চালু দোকানের চার্জ seed আবার চালিয়ে বদলে ফেলা চলবে না
+  if (existing > 0) {
+    console.log(`Shipping zones already set up (${existing})`);
+    return;
+  }
+
+  await prisma.shippingZone.createMany({
+    data: [
+      {
+        name: 'ঢাকা সিটি',
+        districts: ['Dhaka', 'ঢাকা'],
+        chargePaisa: 6_000, // ৬০ টাকা
+        freeAbovePaisa: 150_000, // ১৫০০ টাকার উপরে ফ্রি
+        isDefault: false,
+        sortOrder: 0,
+      },
+      {
+        name: 'ঢাকার বাইরে',
+        // জেলা তালিকা খালি — যা কিছু উপরে মেলেনি সব এখানে পড়বে
+        districts: [],
+        chargePaisa: 12_000, // ১২০ টাকা
+        // বাইরে কুরিয়ার খরচ বেশি, তাই ফ্রি দেওয়া হয় না
+        freeAbovePaisa: null,
+        isDefault: true,
+        sortOrder: 1,
+      },
+    ],
+  });
+
+  console.log('Shipping zones ready: Dhaka + outside (default)');
 }
 
 main().catch((error: unknown) => {
