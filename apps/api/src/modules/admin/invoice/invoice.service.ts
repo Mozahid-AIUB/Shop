@@ -10,6 +10,7 @@ const INVOICE_SELECT = {
   subtotalPaisa: true,
   shippingPaisa: true,
   discountPaisa: true,
+  shippingDiscountPaisa: true,
   totalPaisa: true,
   shipFullName: true,
   shipPhone: true,

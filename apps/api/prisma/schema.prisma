@@ -31,20 +31,23 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
-  cart          Cart?
-  addresses     Address[]
-  orders        Order[]
+  refreshTokens    RefreshToken[]
+  cart             Cart?
+  addresses        Address[]
+  orders           Order[]
   /// এই staff যে পেমেন্টগুলো লিখেছে
   recordedPayments Payment[]
   /// এই staff যে status বদলগুলো করেছে
-  statusChanges OrderStatusHistory[]
+  statusChanges    OrderStatusHistory[]
   /// যে কাজগুলো এই staff-কে দেওয়া হয়েছে
-  assignedTasks ProductionTask[]     @relation("AssignedTasks")
+  assignedTasks    ProductionTask[]     @relation("AssignedTasks")
   /// যে কাজগুলো এই staff তৈরি করেছে
-  createdTasks  ProductionTask[]     @relation("CreatedTasks")
+  createdTasks     ProductionTask[]     @relation("CreatedTasks")
   /// অডিট লগে এই staff-এর কাজ
-  activityLogs  ActivityLog[]
+  activityLogs     ActivityLog[]
+
+  /// কোন কুপন কতবার নিয়েছে — প্রতি-ইউজার সীমা এখান থেকে গোনা হয়
+  couponRedemptions CouponRedemption[]
 
   @@index([role])
   @@map("users")
@@ -53,12 +56,12 @@ model User {
 /// লগইন সেশন. কাঁচা টোকেন কখনো এখানে থাকবে না — শুধু sha256 hash,
 /// যাতে DB লিক হলেও কারো সেশন হাইজ্যাক করা না যায়।
 model RefreshToken {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   /// একটা লগইন থেকে জন্মানো সব টোকেনের একই familyId। rotate হলে নতুন row পায়
   /// কিন্তু family একই থাকে — মুছে ফেলা টোকেন আবার এলে এই family ধরেই চুরি ধরা পড়ে।
   familyId  String
@@ -118,15 +121,15 @@ model Product {
 /// বিক্রির আসল একক। দাম আর স্টক এখানে, Product-এ নয় —
 /// কারণ একই শার্টের M আর XL-এর দাম ও স্টক আলাদা হতে পারে।
 model ProductVariant {
-  id        String  @id @default(cuid())
-  productId String
-  sku       String  @unique
+  id                String  @id @default(cuid())
+  productId         String
+  sku               String  @unique
   /// paisa — ১০০ টাকা = 10000. float কখনো নয়
-  pricePaisa Int
+  pricePaisa        Int
   /// কাটার আগের দাম, ছাড় দেখাতে
   comparePricePaisa Int?
-  stock     Int     @default(0)
-  isActive  Boolean @default(true)
+  stock             Int     @default(0)
+  isActive          Boolean @default(true)
 
   product    Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   options    VariantOption[]
@@ -242,7 +245,7 @@ model CartItem {
 }
 
 model Address {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   userId    String
   label     String?
   fullName  String
@@ -252,7 +255,7 @@ model Address {
   city      String
   district  String
   postcode  String?
-  isDefault Boolean @default(false)
+  isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -265,41 +268,49 @@ model Address {
 /// অর্ডার। ঠিকানা আর দাম এখানে **কপি** করা থাকে —
 /// ইউজার পরে ঠিকানা বদলালে বা পণ্যের দাম বদলালেও পুরোনো অর্ডার অবিকৃত থাকে।
 model Order {
-  id          String      @id @default(cuid())
+  id            String        @id @default(cuid())
   /// ORD-2026-1123-018 — পড়া ও ফোনে বলা সহজ
-  orderNumber String      @unique
-  userId      String
-  status      OrderStatus @default(PENDING)
+  orderNumber   String        @unique
+  userId        String
+  status        OrderStatus   @default(PENDING)
   paymentStatus PaymentStatus @default(UNPAID)
 
   /// সব টাকা integer paisa-তে
-  subtotalPaisa Int
-  shippingPaisa Int @default(0)
-  discountPaisa Int @default(0)
-  totalPaisa    Int
+  subtotalPaisa         Int
+  shippingPaisa         Int @default(0)
+  /// পণ্যের দামে ছাড় (কুপন)
+  discountPaisa         Int @default(0)
+  /// ডেলিভারি চার্জে ছাড় — `FREE_SHIPPING` কুপনের জন্য **আলাদা মাঠ**।
+  /// `discountPaisa`-তে মিশিয়ে দিলে ইনভয়েসে "ডেলিভারি ১২০৳" আর
+  /// "ছাড় ১২০৳" দুটোই দেখাত, আর কুরিয়ারের বিলের সাথে হিসাব মেলানো
+  /// কঠিন হতো। মোট = subtotal + shipping − discount − shippingDiscount
+  shippingDiscountPaisa Int @default(0)
+  totalPaisa            Int
 
   /// ডেলিভারির ঠিকানার স্ন্যাপশট
-  addressId        String?
-  shipFullName     String
-  shipPhone        String
-  shipLine1        String
-  shipLine2        String?
-  shipCity         String
-  shipDistrict     String
-  shipPostcode     String?
+  addressId    String?
+  shipFullName String
+  shipPhone    String
+  shipLine1    String
+  shipLine2    String?
+  shipCity     String
+  shipDistrict String
+  shipPostcode String?
 
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User                 @relation(fields: [userId], references: [id])
-  address Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  items    OrderItem[]
-  history  OrderStatusHistory[]
-  payments Payment[]
-  tasks    ProductionTask[]
+  user             User                 @relation(fields: [userId], references: [id])
+  address          Address?             @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items            OrderItem[]
+  history          OrderStatusHistory[]
+  payments         Payment[]
+  tasks            ProductionTask[]
   /// COD ঝুঁকির হিসাব — checkout-এর সময় একবার
-  fraudCheck FraudCheck?
+  fraudCheck       FraudCheck?
+  /// কোন কুপন ব্যবহার হয়েছে — এক অর্ডারে সর্বোচ্চ একটা
+  couponRedemption CouponRedemption?
 
   @@index([userId, createdAt])
   @@index([status, createdAt])
@@ -310,7 +321,7 @@ model Order {
 /// অর্ডারের সময়কার পণ্যের তথ্য কপি করা — variant পরে মুছে গেলেও
 /// ইনভয়েসে কী কেনা হয়েছিল তা পড়া যাবে।
 model OrderItem {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   orderId   String
   variantId String?
 
@@ -331,16 +342,16 @@ model OrderItem {
 }
 
 model OrderStatusHistory {
-  id        String      @id @default(cuid())
-  orderId   String
-  fromStatus OrderStatus?
-  toStatus  OrderStatus
+  id          String       @id @default(cuid())
+  orderId     String
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
   /// কে বদলালো — null মানে সিস্টেম
   changedById String?
-  note      String?
-  createdAt DateTime    @default(now())
+  note        String?
+  createdAt   DateTime     @default(now())
 
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   /// staff মুছে গেলেও ইতিহাস থাকবে — তাই SetNull, Cascade নয়
   changedBy User? @relation(fields: [changedById], references: [id], onDelete: SetNull)
 
@@ -371,18 +382,18 @@ model Payment {
   recordedBy   User?   @relation(fields: [recordedById], references: [id], onDelete: SetNull)
 
   /// void করার কারণ — অডিটে "কেন বাতিল" প্রশ্নের উত্তর
-  voidedAt     DateTime?
-  voidReason   String?
+  voidedAt   DateTime?
+  voidReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  @@index([orderId, createdAt])
-  @@index([status])
   /// একই TrxID দুবার লেখা আটকায় — ভুল করে দুবার এন্ট্রি দিলে ধরা পড়ে
   @@unique([method, reference])
+  @@index([orderId, createdAt])
+  @@index([status])
   @@map("payments")
 }
 
@@ -550,4 +561,95 @@ model ShippingZone {
 
   @@index([isActive, sortOrder])
   @@map("shipping_zones")
+}
+
+/// কুপন কী ধরনের ছাড় দেয়।
+enum DiscountType {
+  /// শতাংশ — `value` ১০ মানে ১০%
+  PERCENT
+  /// নির্দিষ্ট অঙ্ক — `value` paisa-তে
+  FIXED
+  /// কুরিয়ার খরচ মাফ, পণ্যের দামে ছাড় নয়
+  FREE_SHIPPING
+}
+
+/// ছাড়ের কুপন।
+///
+/// **কেন সব শর্ত DB-তে:** মালিকের চাওয়া "যখন যেমন ইচ্ছা তেমন অফার"।
+/// অফারের নিয়ম কোডে লিখলে প্রতিটা নতুন ক্যাম্পেইনে deploy লাগত।
+/// এখানে সব মাঠ অ্যাডমিন প্যানেল থেকে ঠিক করা যায়, তাই একই কোড দিয়ে
+/// ঈদের ১০%, নির্দিষ্ট ২০০ টাকা, বা ফ্রি ডেলিভারি — সব চালানো যায়।
+model Coupon {
+  id          String  @id @default(cuid())
+  /// "SAVE50" — সবসময় **বড় হাতে** সংরক্ষিত, কারণ ক্রেতা যেভাবেই
+  /// টাইপ করুক একই কুপন খুঁজে পেতে হবে
+  code        String  @unique
+  /// অ্যাডমিনের নিজের জন্য নোট — "ঈদ ক্যাম্পেইন ২০২৬"
+  description String?
+
+  type  DiscountType
+  /// `PERCENT`-এ শতাংশ, `FIXED`-এ paisa, `FREE_SHIPPING`-এ অব্যবহৃত
+  value Int
+
+  /// `PERCENT`-এর সর্বোচ্চ ছাড় — "১০% কিন্তু সর্বোচ্চ ২০০ টাকা"।
+  /// বড় অর্ডারে অনিচ্ছাকৃত বড় ছাড় আটকায়। `null` = সীমা নেই
+  maxDiscountPaisa Int?
+
+  /// এর চেয়ে কম অর্ডারে কুপন চলবে না
+  minOrderPaisa Int @default(0)
+
+  /// মেয়াদ। `null` মানে ওই দিকে কোনো সীমা নেই
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  /// সব মিলিয়ে সর্বোচ্চ কতবার চলবে। `null` = সীমা নেই
+  maxUses        Int?
+  /// এক ক্রেতা কতবার। ডিফল্ট ১ — নইলে একজনই পুরো ক্যাম্পেইন খেয়ে ফেলত
+  maxUsesPerUser Int  @default(1)
+
+  /// ক্যাম্পেইন সাথে সাথে বন্ধ করার সুইচ — মেয়াদ বদলানোর দরকার নেই
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  redemptions CouponRedemption[]
+
+  /// সক্রিয় কুপনের তালিকা অ্যাডমিন প্যানেলে
+  @@index([isActive, endsAt])
+  @@map("coupons")
+}
+
+/// কে কখন কোন কুপন ব্যবহার করল।
+///
+/// **`Coupon.usedCount` রাখা হয় না** — সেটা দুই জায়গায় সত্য হতো, আর
+/// অর্ডার বাতিল হলে বা গোনায় ভুল হলে দুটো আর মিলত না। ব্যবহারের
+/// সংখ্যা সবসময় এই table থেকে গোনা হয়।
+///
+/// গোনা আর লেখা **একই transaction-এ** হয় (`coupon.service.ts`),
+/// নইলে দুটো চেকআউট একই শেষ কুপন পেয়ে যেত।
+model CouponRedemption {
+  id       String @id @default(cuid())
+  couponId String
+  userId   String
+  /// এক অর্ডারে একটাই কুপন — তাই `@unique`। এটাই race-এর আসল রক্ষা:
+  /// একই অর্ডারে দুবার লেখার চেষ্টা DB-তেই আটকে যায়
+  orderId  String @unique
+
+  /// কত ছাড় পেল — পরে কুপনের মান বদলালেও এই অর্ডারের ইতিহাস ঠিক থাকে
+  discountPaisa         Int
+  /// ডেলিভারিতে কত ছাড় — `FREE_SHIPPING`-এর জন্য আলাদা
+  shippingDiscountPaisa Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// একই কুপন একই অর্ডারে দুবার নয়
+  @@unique([couponId, orderId])
+  /// "এই ক্রেতা এই কুপন কতবার নিল" — প্রতি checkout-এ গোনা হয়
+  @@index([couponId, userId])
+  @@map("coupon_redemptions")
 }

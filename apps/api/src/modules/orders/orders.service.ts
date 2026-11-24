@@ -11,6 +11,7 @@ import { formatOptions } from './cart.service';
 import { FraudService } from './fraud.service';
 import { OrderNumberService } from './order-number.service';
 import { ShippingService } from '../shipping/shipping.service';
+import { CouponService, type AppliedCoupon } from '../coupons/coupon.service';
 
 const ORDER_LIST_SELECT = {
   id: true,
@@ -20,6 +21,7 @@ const ORDER_LIST_SELECT = {
   subtotalPaisa: true,
   shippingPaisa: true,
   discountPaisa: true,
+  shippingDiscountPaisa: true,
   totalPaisa: true,
   createdAt: true,
   items: { select: { id: true, productName: true, quantity: true }, take: 3 },
@@ -33,6 +35,7 @@ const ORDER_DETAIL_SELECT = {
   subtotalPaisa: true,
   shippingPaisa: true,
   discountPaisa: true,
+  shippingDiscountPaisa: true,
   totalPaisa: true,
   shipFullName: true,
   shipPhone: true,
@@ -83,7 +86,86 @@ export class OrdersService {
     private readonly orderNumbers: OrderNumberService,
     private readonly fraud: FraudService,
     private readonly shippingRules: ShippingService,
+    private readonly coupons: CouponService,
   ) {}
+
+  /**
+   * কুপনের ব্যবহার লিখে রাখা — অর্ডার তৈরি হওয়ার **পরে**, কারণ
+   * `CouponRedemption.orderId` দরকার।
+   *
+   * `orderId @unique` থাকায় একই অর্ডারে দুবার লেখার চেষ্টা DB-তেই
+   * আটকায় — এটাই race-এর শেষ রক্ষা।
+   */
+  private async recordCouponUse(
+    tx: Prisma.TransactionClient,
+    applied: AppliedCoupon | null,
+    userId: string,
+    orderId: string,
+  ): Promise<void> {
+    if (applied === null) {
+      return;
+    }
+
+    await this.coupons.recordRedemption(tx, {
+      couponId: applied.couponId,
+      userId,
+      orderId,
+      discountPaisa: applied.discountPaisa,
+      shippingDiscountPaisa: applied.shippingDiscountPaisa,
+    });
+  }
+
+  /**
+   * কুপন প্রয়োগ — **অর্ডারের transaction-এর ভেতর থেকেই**, ইচ্ছাকৃতভাবে।
+   *
+   * ব্যবহারের সংখ্যা গোনা আর লেখা একই transaction-এ না হলে দুটো
+   * চেকআউট একসাথে এসে দুজনেই শেষ কুপনটা পেয়ে যেত। আর অর্ডার কোনো
+   * কারণে ব্যর্থ হলে কুপনের ব্যবহারও rollback হয় — নইলে ক্রেতা কুপন
+   * হারাত অথচ অর্ডার পেত না।
+   *
+   * ছাড়ের অঙ্ক **সার্ভারের নিজের গোনা** subtotal দিয়ে হিসাব হয়,
+   * ক্লায়েন্টের পাঠানো কিছু দিয়ে নয়।
+   */
+  private applyCoupon(
+    tx: Prisma.TransactionClient,
+    code: string | undefined,
+    amounts: { userId: string; subtotalPaisa: number; shippingPaisa: number },
+  ): Promise<AppliedCoupon | null> {
+    if (code === undefined) {
+      return Promise.resolve(null);
+    }
+
+    return this.coupons.apply(tx, {
+      code,
+      userId: amounts.userId,
+      subtotalPaisa: amounts.subtotalPaisa,
+      shippingPaisa: amounts.shippingPaisa,
+    });
+  }
+
+  /**
+   * স্টক কমিয়ে রাখা — oversell-এর আসল রক্ষা।
+   *
+   * `stock: { gte: quantity }` শর্তে conditional update: না মিললে
+   * `count` ০ আসে আর আমরা throw করি, ফলে পুরো transaction rollback
+   * হয়। আগে পড়ে তারপর লেখা (read-then-write) করলে দুটো চেকআউট একই
+   * স্টক পড়ে দুটোই পাস করে ফেলত — শেষ পিসটা দুজনকে বিক্রি হতো।
+   */
+  private async reserveStock(
+    tx: Prisma.TransactionClient,
+    lines: readonly { variantId: string; quantity: number; productName: string }[],
+  ): Promise<void> {
+    for (const line of lines) {
+      const updated = await tx.productVariant.updateMany({
+        where: { id: line.variantId, stock: { gte: line.quantity } },
+        data: { stock: { decrement: line.quantity } },
+      });
+
+      if (updated.count === 0) {
+        throw new ConflictException(`"${line.productName}" স্টকে নেই`);
+      }
+    }
+  }
 
   /**
    * চেকআউট। একটা transaction-এ সব — নম্বর, স্টক, অর্ডার।
@@ -156,28 +238,19 @@ export class OrdersService {
      */
     const shippingQuote = await this.shippingRules.quote(shipping.shipDistrict, subtotalPaisa);
     const shippingPaisa = shippingQuote.chargePaisa;
-    const discountPaisa = 0;
 
     const created = await this.prisma.$transaction(
       async (tx) => {
-        /**
-         * স্টক কমানো — conditional update, এটাই oversell-এর আসল রক্ষা।
-         * `stock: { gte: quantity }` শর্তে না মিললে `count` ০ আসে, তখন
-         * আমরা throw করি আর পুরো transaction rollback হয়।
-         *
-         * আগে পড়ে তারপর লেখা (read-then-write) করলে দুটো চেকআউট একই
-         * স্টক পড়ে দুটোই পাস করে ফেলত।
-         */
-        for (const line of lines) {
-          const updated = await tx.productVariant.updateMany({
-            where: { id: line.variantId, stock: { gte: line.quantity } },
-            data: { stock: { decrement: line.quantity } },
-          });
+        await this.reserveStock(tx, lines);
 
-          if (updated.count === 0) {
-            throw new ConflictException(`"${line.productName}" স্টকে নেই`);
-          }
-        }
+        const applied = await this.applyCoupon(tx, input.couponCode, {
+          userId,
+          subtotalPaisa,
+          shippingPaisa,
+        });
+
+        const discountPaisa = applied?.discountPaisa ?? 0;
+        const shippingDiscountPaisa = applied?.shippingDiscountPaisa ?? 0;
 
         // নম্বর transaction-এর ভেতরেই — লক ধরে রাখতে হয়
         const orderNumber = await this.orderNumbers.next(tx);
@@ -189,7 +262,15 @@ export class OrdersService {
             subtotalPaisa,
             shippingPaisa,
             discountPaisa,
-            totalPaisa: subtotalPaisa + shippingPaisa - discountPaisa,
+            shippingDiscountPaisa,
+            /**
+             * মোট = পণ্য + ডেলিভারি − ছাড় − ডেলিভারির ছাড়।
+             *
+             * দুই ছাড় আলাদা রাখা হয় যাতে ইনভয়েসে "ডেলিভারি ১২০৳"
+             * আর "ডেলিভারি ফ্রি" একসাথে না দেখায়, আর কুরিয়ারের
+             * বিলের সাথে হিসাব মেলানো যায়।
+             */
+            totalPaisa: subtotalPaisa + shippingPaisa - discountPaisa - shippingDiscountPaisa,
             note: input.note ?? null,
             ...shipping,
             items: { create: lines },
@@ -198,6 +279,8 @@ export class OrdersService {
           },
           select: ORDER_DETAIL_SELECT,
         });
+
+        await this.recordCouponUse(tx, applied, userId, order.id);
 
         // অর্ডার হয়ে গেলে কার্ট খালি — নইলে ইউজার আবার একই অর্ডার দিয়ে ফেলবে
         await tx.cartItem.deleteMany({ where: { cartId: cart.id } });

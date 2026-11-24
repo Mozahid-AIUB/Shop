@@ -131,15 +131,40 @@ model CouponRedemption {
 | মেয়াদ শেষ কুপন | `startsAt`/`endsAt` checkout-এর সময় যাচাই |
 | কুপন অনুমান করা | `/coupons/validate`-এ rate limit |
 
-- [ ] 15.1 **টেস্ট:** তিন ধরনের ছাড়ের হিসাব (বিশুদ্ধ ফাংশন, shared-এ)
-- [ ] 15.2 **টেস্ট:** ছাড় কখনো মোটের চেয়ে বেশি নয়, total ঋণাত্মক নয়
-- [ ] 15.3 **টেস্ট:** সব শর্ত — মেয়াদ, সর্বোচ্চ ব্যবহার, প্রতি-ইউজার, ন্যূনতম অর্ডার
-- [ ] 15.4 Schema + migration
-- [ ] 15.5 `coupon.service.ts` — `validate()` আর `redeem()`
-- [ ] 15.6 checkout-এ যুক্ত, **একই transaction-এ**
-- [ ] 15.7 **টেস্ট:** একসাথে দুটো অর্ডারে একই শেষ কুপন — একটাই পাবে
-- [ ] 15.8 Public `POST /coupons/validate` (rate limited)
-- [ ] 15.9 Admin CRUD + কোন কুপন কতবার চলল
+- [x] 15.1 **টেস্ট:** তিন ধরনের ছাড়ের হিসাব (বিশুদ্ধ ফাংশন, shared-এ)
+- [x] 15.2 **টেস্ট:** ছাড় কখনো মোটের চেয়ে বেশি নয়, total ঋণাত্মক নয়
+- [x] 15.3 **টেস্ট:** সব শর্ত — মেয়াদ, সর্বোচ্চ ব্যবহার, প্রতি-ইউজার, ন্যূনতম অর্ডার
+- [x] 15.4 Schema + migration
+- [x] 15.5 `coupon.service.ts` — `validate()` আর `redeem()`
+- [x] 15.6 checkout-এ যুক্ত, **একই transaction-এ**
+- [x] 15.7 **টেস্ট:** একসাথে দুটো অর্ডারে একই শেষ কুপন — একটাই পাবে
+- [x] 15.8 Public `POST /coupons/validate` (rate limited)
+- [x] 15.9 Admin CRUD + কোন কুপন কতবার চলল
+
+### যা তৈরি হলো (API)
+
+| Method | Path | কে |
+|---|---|---|
+| POST | `/coupons/validate` | লগইন করা ক্রেতা (rate limit: মিনিটে ১০) |
+| GET | `/admin/coupons` | `SUPER_ADMIN` |
+| POST | `/admin/coupons` | `SUPER_ADMIN` |
+| PATCH | `/admin/coupons/:id` | `SUPER_ADMIN` |
+| DELETE | `/admin/coupons/:id` | `SUPER_ADMIN` — ব্যবহার হলে `400` |
+| GET | `/admin/coupons/:id/usage` | `SUPER_ADMIN` — কতবার, কত টাকা |
+
+চেকআউটে `POST /orders`-এ ঐচ্ছিক `couponCode` — **শুধু কোড, ছাড়ের
+অঙ্ক নয়**। অঙ্ক ইনপুটে নিলে যে কেউ ব্রাউজার থেকে নিজের দাম ঠিক করত।
+
+**অর্ডারে দুটো আলাদা ছাড়ের মাঠ:** `discountPaisa` (পণ্যে) আর
+`shippingDiscountPaisa` (ডেলিভারিতে)। এক মাঠে মেশালে ইনভয়েসে
+"ডেলিভারি ১২০৳" আর "ছাড় ১২০৳" দুটোই দেখাত আর কুরিয়ারের বিলের সাথে
+হিসাব মেলানো কঠিন হতো।
+
+**কোড বদলানো যায় না** (update schema-তে মাঠটাই নেই) — বদলালে যে
+ক্রেতারা পুরোনো কোড পেয়েছে তাদের কাছে হঠাৎ অচল হতো। নতুন কোড লাগলে
+নতুন কুপন বানাও। বন্ধ করতে `isActive: false`।
+
+**৫৮টা টেস্ট** — ২৫ unit (বিশুদ্ধ হিসাব) + ৩৩ e2e, race সহ।
 
 ---
 
