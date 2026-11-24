@@ -179,12 +179,59 @@ describe('Coupons', () => {
       await request(app.getHttpServer()).get('/admin/coupons').expect(401);
     });
 
-    /** যাচাইয়েও লগইন লাগে — প্রতি-ইউজার সীমা গুনতে হয়। */
-    it('needs a login to validate a code', async () => {
-      await request(app.getHttpServer())
+    /**
+     * যাচাই গেস্টও করতে পারে (Phase 18)।
+     *
+     * না পারলে গেস্ট কার্টের পাতায় কুপন বসিয়ে ছাড় দেখতেই পেত না,
+     * আর চেকআউটে গিয়ে চমকে যেত। অনুমান করে কোড খোঁজা rate limit
+     * দিয়ে আটকায়, যেটা IP ধরে চলে — পরিচয় ছাড়াও কাজ করে।
+     */
+    it('lets an anonymous caller check a code', async () => {
+      const response = await request(app.getHttpServer())
         .post('/coupons/validate')
-        .send({ code: 'ANYTHING', subtotalPaisa: 50_000 })
-        .expect(401);
+        .send({ code: `NOSUCH${stamp}`, subtotalPaisa: 50_000 })
+        .expect(200);
+
+      expect(response.body.ok).toBe(false);
+    });
+
+    /**
+     * কিন্তু প্রতি-ক্রেতা সীমাওয়ালা কুপন গেস্ট পায় না — গোনার
+     * জন্য `userId` লাগে, আর গেস্টের সেটা নেই। চুপচাপ সীমাটা
+     * উপেক্ষা করলে একজনই incognito খুলে পুরো ক্যাম্পেইন নিয়ে নিত।
+     */
+    it('withholds a per-customer limited coupon from an anonymous caller', async () => {
+      const code = `ANONLIM${stamp}`;
+
+      await makeCoupon({ code, type: 'FIXED', value: 5_000, maxUsesPerUser: 1 });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupons/validate')
+        .send({ code, subtotalPaisa: 50_000 })
+        .expect(200);
+
+      expect(response.body.ok).toBe(false);
+      expect(response.body.message).toContain('লগইন');
+    });
+
+    /** সীমা তুলে দিলে গেস্টও পায় — অ্যাডমিনের সিদ্ধান্ত। */
+    it('gives an anonymous caller a coupon with no per-customer limit', async () => {
+      const code = `ANONFREE${stamp}`;
+
+      await makeCoupon({
+        code,
+        type: 'FIXED',
+        value: 5_000,
+        maxUsesPerUser: null,
+      });
+
+      const response = await request(app.getHttpServer())
+        .post('/coupons/validate')
+        .send({ code, subtotalPaisa: 50_000 })
+        .expect(200);
+
+      expect(response.body.ok).toBe(true);
+      expect(response.body.discountPaisa).toBe(5_000);
     });
   });
 

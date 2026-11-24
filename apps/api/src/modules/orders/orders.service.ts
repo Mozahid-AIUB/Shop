@@ -7,6 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 import type { CheckoutInput } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { cartWhere, type CartOwner } from './cart-owner';
 import { formatOptions } from './cart.service';
 import { FraudService } from './fraud.service';
 import { OrderNumberService } from './order-number.service';
@@ -99,7 +100,7 @@ export class OrdersService {
   private async recordCouponUse(
     tx: Prisma.TransactionClient,
     applied: AppliedCoupon | null,
-    userId: string,
+    userId: string | null,
     orderId: string,
   ): Promise<void> {
     if (applied === null) {
@@ -129,7 +130,7 @@ export class OrdersService {
   private applyCoupon(
     tx: Prisma.TransactionClient,
     code: string | undefined,
-    amounts: { userId: string; subtotalPaisa: number; shippingPaisa: number },
+    amounts: { userId: string | null; subtotalPaisa: number; shippingPaisa: number },
   ): Promise<AppliedCoupon | null> {
     if (code === undefined) {
       return Promise.resolve(null);
@@ -174,9 +175,16 @@ export class OrdersService {
    *
    * দাম **কোথাও** ইনপুট থেকে আসে না — সব DB থেকে পড়া হয়।
    */
-  async checkout(userId: string, input: CheckoutInput): Promise<OrderDetail> {
+  async checkout(owner: CartOwner, input: CheckoutInput): Promise<OrderDetail> {
+    /**
+     * গেস্ট হলে `userId` `null` — অর্ডারটা কোনো অ্যাকাউন্টে বাঁধা
+     * থাকবে না। এটা একবার এখানে বের করে নিচে সব জায়গায় ব্যবহার
+     * করা হয়, যাতে প্রতিবার `owner.kind` দেখতে না হয়।
+     */
+    const userId = owner.kind === 'user' ? owner.userId : null;
+
     const cart = await this.prisma.cart.findUnique({
-      where: { userId },
+      where: cartWhere(owner),
       select: {
         id: true,
         items: {
@@ -211,7 +219,7 @@ export class OrdersService {
       throw new ConflictException(`"${unavailable.variant.product.name}" আর বিক্রি হচ্ছে না`);
     }
 
-    const shipping = await this.resolveShipping(userId, input);
+    const shipping = await this.resolveShipping(owner, input);
 
     // দাম সার্ভারে, DB-র `pricePaisa` ধরে — integer paisa, float নয়
     const lines = cart.items.map((item) => ({
@@ -311,6 +319,20 @@ export class OrdersService {
     return created;
   }
 
+  /**
+   * নিজের অর্ডারের তালিকা — **শুধু লগইন করা ক্রেতার জন্য**।
+   *
+   * `userId` এখানে কখনো `null` বা `undefined` হতে পারে না, আর
+   * টাইপটাই সেটা আটকায়। `Order.userId` nullable হওয়ার পর এটা
+   * গুরুত্বপূর্ণ হয়ে উঠেছে:
+   *
+   * - `undefined` গেলে Prisma শর্তটাই বাদ দিত আর **দোকানের সব
+   *   অর্ডার** ফেরত আসত
+   * - `null` গেলে **সব গেস্ট অর্ডার** ফেরত আসত
+   *
+   * গেস্টের জন্য এই পথ নেই — সে `/track`-এ অর্ডার নম্বর আর
+   * ফোন দিয়ে দেখে, দুটোই জানা লাগে।
+   */
   list(userId: string): Promise<OrderSummary[]> {
     return this.prisma.order.findMany({
       where: { userId },
@@ -341,7 +363,58 @@ export class OrdersService {
    * দুই ক্ষেত্রেই অর্ডারে **কপি** বসে — ইউজার পরে ঠিকানা বদলালে বা
    * মুছলেও পুরোনো অর্ডার কোথায় গিয়েছিল তা জানা থাকে।
    */
-  private async resolveShipping(userId: string, input: CheckoutInput): Promise<ShippingSnapshot> {
+  /**
+   * গেস্টের ঠিকানা — শুধু অর্ডারে **কপি** বসে, কোথাও সংরক্ষিত হয় না।
+   *
+   * `Address` row বানানো যায় না: সেটা `userId` দাবি করে, আর গেস্টের
+   * অ্যাকাউন্ট নেই। সংরক্ষণ না হওয়াটা সমস্যা নয় — গেস্ট পরের বার
+   * এমনিতেও এই ঠিকানা ফিরে পেত না, কারণ তাকে চেনার কিছু নেই।
+   * কুরিয়ারের দরকার শুধু snapshot-টা, আর সেটা অর্ডারেই থাকে।
+   */
+  private snapshotFromInput(input: CheckoutInput): ShippingSnapshot {
+    if (input.address === undefined) {
+      // schema-র refine এটা আগেই আটকায়; এখানে টাইপ সংকুচিত করার জন্য
+      throw new BadRequestException('ঠিকানা দিন');
+    }
+
+    const fresh = input.address;
+
+    return {
+      // গেস্টের কোনো `Address` row নেই, তাই কিছুর সাথে জোড়া লাগে না
+      addressId: null,
+      shipFullName: fresh.fullName,
+      shipPhone: fresh.phone,
+      shipLine1: fresh.line1,
+      shipLine2: fresh.line2 ?? null,
+      shipCity: fresh.city,
+      shipDistrict: fresh.district,
+      shipPostcode: fresh.postcode ?? null,
+    };
+  }
+
+  private async resolveShipping(
+    owner: CartOwner,
+    input: CheckoutInput,
+  ): Promise<ShippingSnapshot> {
+    /**
+     * গেস্টের সংরক্ষিত ঠিকানা থাকতে পারে না — `Address` অ্যাকাউন্টের
+     * সাথে বাঁধা। তাই `addressId` পাঠানো হলেও সেটা তার নয়।
+     *
+     * **এটা নীরবে উপেক্ষা করা হয় না।** উপেক্ষা করলে গেস্ট ভাবত
+     * ঠিকানা গেছে, অথচ `input.address` না থাকায় নিচে "ঠিকানা দিন"
+     * বলত — বিভ্রান্তিকর। আর আইডিটা যদি সত্যিই কারো ঠিকানা হয়,
+     * অনুমান করে অন্যের ঠিকানায় পণ্য পাঠানোর চেষ্টা হতো।
+     */
+    if (owner.kind === 'guest') {
+      if (input.addressId !== undefined) {
+        throw new BadRequestException('সংরক্ষিত ঠিকানা ব্যবহার করতে লগইন করুন');
+      }
+
+      return this.snapshotFromInput(input);
+    }
+
+    const userId = owner.userId;
+
     if (input.addressId !== undefined) {
       const address = await this.prisma.address.findFirst({
         where: { id: input.addressId, userId },

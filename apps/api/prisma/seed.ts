@@ -246,16 +246,26 @@ async function seedCoupons(prisma: PrismaClient): Promise<void> {
       },
       {
         code: 'FREESHIP',
-        description: '১৫০০ টাকার উপরে ডেলিভারি ফ্রি',
+        description: '১৫০০ টাকার উপরে ডেলিভারি ফ্রি — গেস্টও পাবে',
         type: 'FREE_SHIPPING',
         value: 0,
         minOrderPaisa: 150_000,
-        maxUsesPerUser: 3,
+        /**
+         * `null` = প্রতি-ক্রেতা সীমা নেই, তাই **গেস্টও পায়**।
+         *
+         * ফেসবুক অ্যাড থেকে আসা ক্রেতা সাধারণত অ্যাকাউন্ট খোলে না।
+         * সীমা বসালে তার কাছে "লগইন করুন" দেখাত আর অ্যাডের টাকাটা
+         * নষ্ট হতো। ডেলিভারি ফ্রি অফারটা ঠিক তাদেরই টানার জন্য।
+         *
+         * দামটা: যে কেউ যতবার ইচ্ছা নিতে পারে, তাই এমন কুপনে
+         * `minOrderPaisa` আর `endsAt` দিয়ে লাগাম দেওয়া জরুরি।
+         */
+        maxUsesPerUser: null,
       },
     ],
   });
 
-  console.log('Coupons ready: WELCOME10, FLAT100, FREESHIP');
+  console.log('Coupons ready: WELCOME10, FLAT100, FREESHIP (guests may use FREESHIP)');
 }
 
 main().catch((error: unknown) => {

@@ -18,19 +18,20 @@ import {
   type CouponUpdate,
   type CouponValidateResult,
 } from '@shop/shared';
-import type { AccessTokenPayload } from '@shop/shared';
 import { z } from 'zod';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { THROTTLE_COUPON } from '../../common/throttle.config';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Owner, type CartOwner } from '../orders/cart-owner';
+import { OptionalAuth } from '../auth/decorators/optional-auth.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CouponService } from './coupon.service';
 
 /**
  * কার্টে কোড বসিয়ে যাচাই।
  *
- * **লগইন লাগে** — প্রতি-ইউজার সীমা গুনতে হয় (`maxUsesPerUser`), আর
- * কে কোন কোড চেষ্টা করছে সেটা জানা না থাকলে rate limit-ও অর্থহীন।
+ * **গেস্টও পারে।** না পারলে গেস্ট কার্টের পাতায় কুপন বসিয়ে ছাড়
+ * দেখতেই পেত না, আর চেকআউটে গিয়ে চমকে যেত। rate limit IP ধরে
+ * চলে, তাই পরিচয় ছাড়াও কোড অনুমান করা আটকায়।
  */
 const validateBodySchema = z.object({
   code: z.string().trim().min(1, 'কুপন কোড দিন').max(32),
@@ -59,12 +60,21 @@ export class CouponController {
    */
   @Throttle({ [THROTTLE_COUPON]: { limit: 10, ttl: 60_000 } })
   @Post('validate')
+  @OptionalAuth()
   @HttpCode(HttpStatus.OK)
   validate(
-    @CurrentUser() user: AccessTokenPayload,
+    @Owner() owner: CartOwner | null,
     @Body(new ZodValidationPipe(validateBodySchema)) body: ValidateBody,
   ): Promise<CouponValidateResult> {
-    return this.coupons.validate(body.code, user.sub, {
+    /**
+     * গেস্ট হলে `null` — তখন প্রতি-ক্রেতা সীমাওয়ালা কুপন
+     * `LOGIN_REQUIRED` বলে ফিরিয়ে দেয়, আর UI ক্রেতাকে লগইন করতে
+     * বলতে পারে। চেকআউটেও একই নিয়ম, তাই কার্টে যা দেখবে
+     * চেকআউটেও তাই পাবে।
+     */
+    const userId = owner !== null && owner.kind === 'user' ? owner.userId : null;
+
+    return this.coupons.validate(body.code, userId, {
       subtotalPaisa: body.subtotalPaisa,
       shippingPaisa: body.shippingPaisa,
     });

@@ -29,7 +29,14 @@ export type CouponLike = {
   endsAt: Date | null;
   /** সব মিলিয়ে সর্বোচ্চ কতবার। `null` = সীমা নেই */
   maxUses: number | null;
-  maxUsesPerUser: number;
+  /**
+   * একজন ক্রেতা সর্বোচ্চ কতবার। `null` = প্রতি-ক্রেতা সীমা নেই।
+   *
+   * `null` রাখলে কুপনটা **গেস্টও** পায়, কারণ তখন কারো ব্যবহার গোনার
+   * দরকারই নেই। সীমা বসালে কুপন লগইন করা ক্রেতার জন্য সংরক্ষিত
+   * হয়ে যায় — অ্যাডমিনের ইচ্ছামতো।
+   */
+  maxUsesPerUser: number | null;
   isActive: boolean;
 };
 
@@ -47,6 +54,18 @@ export const COUPON_FAILURE = {
   BELOW_MINIMUM: 'BELOW_MINIMUM',
   EXHAUSTED: 'EXHAUSTED',
   ALREADY_USED: 'ALREADY_USED',
+  /**
+   * প্রতি-ক্রেতা সীমাওয়ালা কুপন, কিন্তু ক্রেতার পরিচয় নেই (গেস্ট)।
+   *
+   * গেস্টের `userId` নেই, তাই "এই ক্রেতা কতবার নিয়েছে" গোনার কোনো
+   * উপায় নেই। চুপচাপ সীমাটা উপেক্ষা করলে একজনই পুরো ক্যাম্পেইন খেয়ে
+   * ফেলত — incognito খুলে যতবার ইচ্ছা। স্পষ্ট প্রত্যাখ্যানই সৎ:
+   * ক্রেতা লগইন করে নিলেই কুপনটা পাবে।
+   *
+   * অ্যাডমিন চাইলে কুপনে `maxUsesPerUser: null` দিয়ে প্রতি-ক্রেতা
+   * সীমা তুলে দিতে পারে — তখন গেস্টও পায়।
+   */
+  LOGIN_REQUIRED: 'LOGIN_REQUIRED',
 } as const;
 
 export type CouponFailure = (typeof COUPON_FAILURE)[keyof typeof COUPON_FAILURE];
@@ -60,6 +79,7 @@ export const COUPON_FAILURE_MESSAGE: Record<CouponFailure, string> = {
   BELOW_MINIMUM: 'অর্ডারের অঙ্ক কুপনের ন্যূনতমের চেয়ে কম',
   EXHAUSTED: 'এই কুপন আর অবশিষ্ট নেই',
   ALREADY_USED: 'এই কুপন আপনি আগেই ব্যবহার করেছেন',
+  LOGIN_REQUIRED: 'এই কুপন ব্যবহার করতে লগইন করুন',
 };
 
 export type CouponDiscount = {
@@ -90,8 +110,15 @@ export type CouponContext = {
   now: Date;
   /** এই কুপন সব মিলিয়ে কতবার ব্যবহার হয়েছে */
   totalUses: number;
-  /** এই ক্রেতা কতবার ব্যবহার করেছে */
-  userUses: number;
+  /**
+   * এই ক্রেতা কতবার ব্যবহার করেছে।
+   *
+   * `null` মানে **গোনা যায় না** — গেস্ট, তার কোনো `userId` নেই।
+   * `0` আর `null` আলাদা: `0` মানে "চেক করা হয়েছে, নেয়নি", `null`
+   * মানে "চেক করার উপায়ই নেই"। একসাথে মিলিয়ে ফেললে সীমাওয়ালা কুপন
+   * গেস্টের কাছে অসীমবার চলত।
+   */
+  userUses: number | null;
 };
 
 /**
@@ -182,8 +209,27 @@ export const evaluateCoupon = (coupon: CouponLike, context: CouponContext): Coup
     return failure(COUPON_FAILURE.EXHAUSTED);
   }
 
-  if (context.userUses >= coupon.maxUsesPerUser) {
-    return failure(COUPON_FAILURE.ALREADY_USED);
+  /**
+   * প্রতি-ক্রেতা সীমা।
+   *
+   * `null` হলে কোনো সীমাই নেই — কিছু গোনার দরকার নেই, তাই গেস্টও
+   * এই কুপন পায়।
+   *
+   * সীমা থাকলে গুনতে হয়, আর গুনতে `userId` লাগে। গেস্টের বেলায়
+   * `userUses` `null` আসে, মানে গোনার উপায় নেই — তখন কুপনটা দেওয়া
+   * হয় না। চুপচাপ সীমাটা উপেক্ষা করলে একজনই incognito খুলে পুরো
+   * ক্যাম্পেইন নিয়ে নিত।
+   *
+   * এটাই একমাত্র জায়গা যেখানে গেস্ট আর সদস্যের আচরণ আলাদা।
+   */
+  if (coupon.maxUsesPerUser !== null) {
+    if (context.userUses === null) {
+      return failure(COUPON_FAILURE.LOGIN_REQUIRED);
+    }
+
+    if (context.userUses >= coupon.maxUsesPerUser) {
+      return failure(COUPON_FAILURE.ALREADY_USED);
+    }
   }
 
   return { ok: true, coupon };

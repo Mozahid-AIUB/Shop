@@ -136,8 +136,53 @@ describe('Cart and checkout', () => {
       expect(response.body.subtotalPaisa).toBe(0);
     });
 
-    it('rejects an anonymous request — চেকআউটে লগইন বাধ্যতামূলক', async () => {
-      await request(app.getHttpServer()).get('/cart').expect(401);
+    /**
+     * পরিচয় ছাড়াও কার্ট **পড়া** যায় — খালি দেখায় (Phase 18)।
+     *
+     * প্রথমবার সাইটে আসা ক্রেতার কাছে এখনো গেস্ট টোকেন নেই। তাকে
+     * ৪০১ দিলে হোমপেজের কার্ট আইকনই ভাঙা দেখাত, অথচ সে কিছু ভুল
+     * করেনি।
+     */
+    it('shows an empty cart to a caller with no identity', async () => {
+      const response = await request(app.getHttpServer()).get('/cart').expect(200);
+
+      expect(response.body.items).toEqual([]);
+      expect(response.body.subtotalPaisa).toBe(0);
+    });
+
+    /**
+     * কিন্তু **লেখা** যায় না — কার কার্টে লিখছি সেটা জানতেই হবে।
+     *
+     * না জেনে লিখলে কার্টটা কারো নয় এমন অবস্থায় পড়ে থাকত আর
+     * ক্রেতা সেটা আর খুঁজে পেত না। গেস্ট আগে `POST /cart/guest`
+     * দিয়ে টোকেন নেয়।
+     */
+    it('refuses to write to a cart with no identity', async () => {
+      await request(app.getHttpServer())
+        .post('/cart/items')
+        .send({ variantId, quantity: 1 })
+        .expect(401);
+    });
+
+    /**
+     * চেকআউটেও একই — অর্ডার কার, সেটা জানতে হবে।
+     *
+     * ঠিকানাটা **বৈধ** পাঠানো হয় ইচ্ছাকৃতভাবে: খালি body পাঠালে
+     * Zod আগেই ৪০০ দিত আর তখন পরিচয়ের অভাবটা আসলে পরীক্ষাই হতো না।
+     */
+    it('refuses a checkout with no identity', async () => {
+      await request(app.getHttpServer())
+        .post('/orders')
+        .send({
+          address: {
+            fullName: 'No Identity',
+            phone: '01800000000',
+            line1: 'Road 1',
+            city: 'Dhaka',
+            district: 'Dhaka',
+          },
+        })
+        .expect(401);
     });
 
     it('adds an item and prices it from the database', async () => {

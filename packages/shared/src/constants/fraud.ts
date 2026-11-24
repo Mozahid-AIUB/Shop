@@ -47,6 +47,16 @@ export const FRAUD_WEIGHTS = {
   newAccountLargeOrder: 20,
   /** একই ঠিকানা, আলাদা অ্যাকাউন্ট — ব্লক এড়ানোর চিহ্ন */
   sharedAddress: 15,
+  /**
+   * অ্যাকাউন্ট ছাড়া (গেস্ট) বড় অঙ্কের COD।
+   *
+   * `newAccountLargeOrder`-এর চেয়ে কম ওজন, ইচ্ছাকৃতভাবে। গেস্ট
+   * চেকআউট আমরা **নিজেরাই** খুলেছি বিক্রি বাড়াতে; যে দরজা দিয়ে
+   * ক্রেতাকে ডেকে এনেছি, সেটা দিয়ে ঢোকার জন্যই তাকে বেশি শাস্তি
+   * দেওয়া স্ববিরোধী হতো। তবু অ্যাকাউন্টহীন বড় COD-এ ফেরত আসার
+   * হার বেশি, তাই অ্যাডমিনের একবার ফোন করা উচিত।
+   */
+  guestLargeOrder: 15,
   /** প্রতিটা সফল ডেলিভারি স্কোর **কমায়** */
   perSuccessfulOrder: -15,
   /** সফল অর্ডারের জন্য সর্বোচ্চ ছাড় */
@@ -70,7 +80,13 @@ export const FRAUD_NEW_ACCOUNT_DAYS = 7;
  * স্কোর মানুষ হয় অন্ধভাবে মানে, নয় একেবারে উপেক্ষা করে।
  */
 export type FraudReason = {
-  code: 'FAILED_ORDERS' | 'RAPID_ORDERS' | 'NEW_ACCOUNT_LARGE_ORDER' | 'SHARED_ADDRESS' | 'GOOD_HISTORY';
+  code:
+    | 'FAILED_ORDERS'
+    | 'RAPID_ORDERS'
+    | 'NEW_ACCOUNT_LARGE_ORDER'
+    | 'GUEST_LARGE_ORDER'
+    | 'SHARED_ADDRESS'
+    | 'GOOD_HISTORY';
   points: number;
   /** বাংলায় পড়ার মতো ব্যাখ্যা — সরাসরি প্যানেলে দেখানো যায় */
   detail: string;
@@ -84,13 +100,25 @@ export type FraudSignals = {
   successfulOrders: number;
   /** গত ২৪ ঘণ্টায় এই ফোনে কতগুলো অর্ডার (এটা সহ) */
   recentOrderCount: number;
-  /** অ্যাকাউন্টের বয়স, দিনে */
-  accountAgeDays: number;
+  /**
+   * অ্যাকাউন্টের বয়স, দিনে। `null` = গেস্ট, অ্যাকাউন্টই নেই।
+   *
+   * `0` আর `null` আলাদা: `0` মানে "আজ অ্যাকাউন্ট খুলেছে", `null`
+   * মানে "কোনো অ্যাকাউন্ট নেই"। `0` ধরে নিলে গেস্ট প্রতিবার
+   * "নতুন অ্যাকাউন্ট" হিসেবে গোনা হতো, যা মিথ্যা — আর ব্যাখ্যায়
+   * অ্যাডমিন "অ্যাকাউন্ট ০ দিনের" দেখে বিভ্রান্ত হতো।
+   */
+  accountAgeDays: number | null;
   /** এই অর্ডারের মোট, paisa-তে */
   orderTotalPaisa: number;
   /** "বড় অর্ডার" কত থেকে — `.env` দিয়ে বদলানো যায় */
   largeOrderPaisa: number;
-  /** একই ঠিকানা অন্য কোনো অ্যাকাউন্টও ব্যবহার করেছে কিনা */
+  /**
+   * একই ঠিকানা অন্য কেউ ব্যবহার করেছে কিনা।
+   *
+   * সদস্যের বেলায় "অন্য অ্যাকাউন্ট", গেস্টের বেলায় "অন্য ফোন" —
+   * কারণ গেস্টের অ্যাকাউন্ট নেই, ফোনই তার একমাত্র পরিচয়।
+   */
   addressUsedByOthers: boolean;
 };
 
@@ -150,9 +178,12 @@ export const assessFraud = (signals: FraudSignals): FraudAssessment => {
    * নতুন অ্যাকাউন্ট **একা** সন্দেহের কারণ নয় — সব ক্রেতাই একদিন
    * নতুন ছিল। বড় অঙ্কের সাথে মিললে তবেই ঝুঁকি।
    */
+  const isLargeOrder = signals.orderTotalPaisa >= signals.largeOrderPaisa;
+
   if (
+    signals.accountAgeDays !== null &&
     signals.accountAgeDays < FRAUD_NEW_ACCOUNT_DAYS &&
-    signals.orderTotalPaisa >= signals.largeOrderPaisa
+    isLargeOrder
   ) {
     score += FRAUD_WEIGHTS.newAccountLargeOrder;
     reasons.push({
@@ -162,12 +193,29 @@ export const assessFraud = (signals: FraudSignals): FraudAssessment => {
     });
   }
 
+  /**
+   * গেস্টের বড় COD।
+   *
+   * অ্যাকাউন্ট ছাড়া অর্ডারে ক্রেতাকে চেনার একমাত্র সূত্র ফোন নম্বর,
+   * আর সেটা যাচাই করা নেই (OTP Phase 08-এ)। ছোট অর্ডারে এটা ধরা
+   * হয় না — গেস্ট চেকআউট তো এজন্যই খোলা, আর প্রতিটা গেস্ট অর্ডারে
+   * সতর্কতা দিলে অ্যাডমিন তালিকাটা পড়াই বন্ধ করে দিত।
+   */
+  if (signals.accountAgeDays === null && isLargeOrder) {
+    score += FRAUD_WEIGHTS.guestLargeOrder;
+    reasons.push({
+      code: 'GUEST_LARGE_ORDER',
+      points: FRAUD_WEIGHTS.guestLargeOrder,
+      detail: 'অ্যাকাউন্ট ছাড়া দেওয়া অর্ডার, আর অঙ্কটা বড়',
+    });
+  }
+
   if (signals.addressUsedByOthers) {
     score += FRAUD_WEIGHTS.sharedAddress;
     reasons.push({
       code: 'SHARED_ADDRESS',
       points: FRAUD_WEIGHTS.sharedAddress,
-      detail: 'এই ঠিকানা অন্য অ্যাকাউন্টও ব্যবহার করেছে',
+      detail: 'এই ঠিকানা অন্য ক্রেতাও ব্যবহার করেছে',
     });
   }
 
