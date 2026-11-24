@@ -2,11 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   escapeLikePattern,
+  type RatingSummary,
   type ProductSearchQuery,
   type ProductSearchResult,
   type SearchSuggestion,
 } from '@shop/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ReviewService } from '../reviews/review.service';
 
 /**
  * Product search for the storefront.
@@ -34,6 +36,8 @@ export interface SearchItem {
   fromPricePaisa: number | null;
   comparePricePaisa: number | null;
   inStock: boolean;
+  /** তালিকার কার্ডে যা থাকে সার্চের কার্ডেও থাকা দরকার — নইলে দুই পাতা দুরকম দেখাত */
+  rating: RatingSummary;
 }
 
 /** SQL থেকে যা ফেরে — snake_case, আর গোনা মান `bigint`। */
@@ -65,7 +69,10 @@ const SUGGESTION_LIMIT = 6;
 
 @Injectable()
 export class SearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reviews: ReviewService,
+  ) {}
 
   /**
    * খোঁজা।
@@ -89,8 +96,11 @@ export class SearchService {
     const hasMore = rows.length > query.limit;
     const page = hasMore ? rows.slice(0, query.limit) : rows;
 
+    // এক query-তে সবগুলোর রেটিং — প্রতি পণ্যে আলাদা ডাকলে N+1 হতো
+    const ratings = await this.reviews.summariesFor(page.map((row) => row.id));
+
     return {
-      items: page.map((row) => this.toItem(row)),
+      items: page.map((row) => this.toItem(row, ratings)),
       nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
       // ফল পেলে সাজেশন দেখানো মানে ক্রেতাকে অন্যদিকে সরিয়ে দেওয়া
       suggestions: page.length === 0 ? await this.suggestCategories() : [],
@@ -232,9 +242,10 @@ export class SearchService {
     return rows;
   }
 
-  private toItem(row: SearchRow): SearchItem {
+  private toItem(row: SearchRow, ratings: Map<string, RatingSummary>): SearchItem {
     return {
       id: row.id,
+      rating: ratings.get(row.id) ?? { average: null, count: 0, breakdown: {} },
       name: row.name,
       slug: row.slug,
       category: { id: row.category_id, name: row.category_name, slug: row.category_slug },

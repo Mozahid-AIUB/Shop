@@ -10,7 +10,8 @@ import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AdminModule } from './modules/admin/admin.module';
 import { CouponModule } from './modules/coupons/coupon.module';
-import { CourierModule } from './modules/courier/courier.module';
+import { CourierModule } from './modules/courier/courier.module';
+import { ReviewModule } from './modules/reviews/review.module';
 import { ShippingModule } from './modules/shipping/shipping.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -36,6 +37,7 @@ import { PrismaModule } from './prisma/prisma.module';
     ShippingModule,
     CouponModule,
     CourierModule,
+    ReviewModule,
   ],
   providers: [
     /**

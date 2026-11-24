@@ -16,7 +16,7 @@
     "dev:web": "npm run dev -w @shop/web",
     "//build": "shared আগে — api আর web দুটোই ওর dist থেকে টাইপ পড়ে, তাই এটা বাদ দিলে fresh clone-এ build ভাঙে",
     "build": "npm run build -w @shop/shared && npm run build -w @shop/api && npm run build -w @shop/web",
-    "test": "npm run test -w @shop/api && npm run test:web",
+    "test": "npm run build -w @shop/shared && npm run test -w @shop/api && npm run test:web",
     "lint": "npm run lint -w @shop/shared && npm run lint -w @shop/api && npm run lint -w @shop/web",
     "db:migrate": "npm run db:migrate -w @shop/api",
     "db:studio": "npm run db:studio -w @shop/api",
