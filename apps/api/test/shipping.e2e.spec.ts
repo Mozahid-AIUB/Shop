@@ -27,6 +27,14 @@ describe('Shipping zones', () => {
   /** টেস্টের তৈরি zone-গুলো — শেষে মুছে ফেলা হয়। */
   const createdZoneIds: string[] = [];
 
+  /**
+   * suite শুরুর সময় যে zone default ছিল।
+   *
+   * default সরানোর টেস্টের পর ঠিক এটাকেই ফেরত বসানো হয়, যাতে পরের
+   * suite-গুলো default ছাড়া DB না পায়।
+   */
+  let previousDefaultId: string | null = null;
+
   const authed = (token: string) => ({ authorization: `Bearer ${token}` });
 
   const makeUser = async (email: string, role?: string): Promise<string> => {
@@ -83,10 +91,35 @@ describe('Shipping zones', () => {
 
     adminToken = await makeUser(adminEmail, 'SUPER_ADMIN');
     buyerToken = await makeUser(buyerEmail);
+
+    const current = await prisma.shippingZone.findFirst({ where: { isDefault: true } });
+
+    previousDefaultId = current?.id ?? null;
   });
 
   afterAll(async () => {
     await prisma.shippingZone.deleteMany({ where: { id: { in: createdZoneIds } } });
+
+    /**
+     * শেষ রক্ষা: DB-তে ঠিক একটা default আছে কিনা নিশ্চিত করা।
+     *
+     * উপরের টেস্টগুলো নিজেরাই ফেরত বসায়, কিন্তু কোনোটা মাঝপথে
+     * ব্যর্থ হলে default ছাড়াই থেকে যেতে পারত — তখন পরের suite-এর
+     * প্রতিটা checkout 500 দিত আর আসল কারণ খুঁজতে অনেক সময় যেত।
+     */
+    const defaults = await prisma.shippingZone.count({ where: { isDefault: true } });
+
+    if (defaults === 0) {
+      const survivor = await prisma.shippingZone.findFirst({ orderBy: { createdAt: 'asc' } });
+
+      if (survivor !== null) {
+        await prisma.shippingZone.update({
+          where: { id: survivor.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
     await prisma.user.deleteMany({ where: { email: { in: [adminEmail, buyerEmail] } } });
     await app.close();
   });
@@ -287,17 +320,28 @@ describe('Shipping zones', () => {
       expect(defaults).toHaveLength(1);
       expect(defaults[0]?.id).toBe(zone.body.id);
 
-      // পরের টেস্টের জন্য আগের অবস্থায় ফেরানো
-      const outside = await prisma.shippingZone.findFirst({
-        where: { name: 'ঢাকার বাইরে' },
-      });
-
-      if (outside !== null) {
+      /**
+       * আগের default-টা ফেরত দেওয়া হয়।
+       *
+       * **নাম দিয়ে খোঁজা হয় না।** আগে seed-এর `'ঢাকার বাইরে'` নামটা
+       * খোঁজা হতো, কিন্তু seed ঐচ্ছিক — CI চালায় না। তখন zone-টা
+       * পাওয়া যেত না, ফেরানো চুপচাপ বাদ পড়ত, আর cleanup-এ এই টেস্টের
+       * zone মুছে গিয়ে DB-তে **একটাও default থাকত না**। ফলে পরের সব
+       * checkout 500 দিত — আর কারণটা এই টেস্টে নয়, অন্য suite-এ ধরা
+       * পড়ত। তাই শুরুতে যেটা default ছিল, সেটাকেই id দিয়ে ফেরানো হয়।
+       */
+      if (previousDefaultId !== null && previousDefaultId !== zone.body.id) {
         await request(app.getHttpServer())
-          .patch(`/admin/shipping-zones/${outside.id}`)
+          .patch(`/admin/shipping-zones/${previousDefaultId}`)
           .set(authed(adminToken))
           .send({ isDefault: true })
           .expect(200);
+
+        const restored = await prisma.shippingZone.findMany({ where: { isDefault: true } });
+
+        // ফেরানো সত্যিই হয়েছে কিনা — নইলে পরের suite ভাঙত
+        expect(restored).toHaveLength(1);
+        expect(restored[0]?.id).toBe(previousDefaultId);
       }
     });
   });

@@ -487,10 +487,24 @@ describe('Admin panel', () => {
 
       expect(response.body).toMatchObject({ orderNumber });
       expect(response.body.items.length).toBeGreaterThan(0);
-      expect(response.body.totalPaisa).toBe(UNIT_PRICE_PAISA * 2);
+
+      expect(response.body.subtotalPaisa).toBe(UNIT_PRICE_PAISA * 2);
+
+      /**
+       * মোট = পণ্য + ডেলিভারি − ছাড়।
+       *
+       * ডেলিভারি চার্জ এখানে **ধরে নেওয়া হয় না** (Phase 14-এর পর
+       * সেটা জেলা আর অ্যাডমিনের নিয়মের উপর নির্ভর করে)। ইনভয়েসের
+       * নিজের অংশগুলো দিয়েই যোগফল মেলানো হয় — এতে চার্জ বদলালেও
+       * টেস্ট ভাঙে না, কিন্তু অঙ্ক না মিললে ঠিকই ধরা পড়ে।
+       */
+      const { subtotalPaisa, shippingPaisa, discountPaisa, totalPaisa } = response.body;
+
+      expect(totalPaisa).toBe(subtotalPaisa + shippingPaisa - discountPaisa);
+
       // আগের টেস্টে ২০০ টাকা নেওয়া হয়েছে
       expect(response.body.paidPaisa).toBe(20_000);
-      expect(response.body.duePaisa).toBe(UNIT_PRICE_PAISA * 2 - 20_000);
+      expect(response.body.duePaisa).toBe(totalPaisa - 20_000);
       expect(response.body.shipFullName).toBe('Panel Buyer');
     });
 
