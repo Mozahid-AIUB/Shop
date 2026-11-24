@@ -32,6 +32,11 @@ jobs:
       # login 500 দেয় আর DB ব্যবহার করা প্রতিটা suite ভেঙে পড়ে।
       # এটা throwaway CI মান; আসল secret কখনো এখানে লেখা হবে না।
       JWT_ACCESS_SECRET: ci-only-access-secret-not-used-anywhere-else
+      # কুরিয়ারের key এনক্রিপ্ট করার চাবি (Phase 10)। ছাড়া dev fallback
+      # দিয়ে চলত, কিন্তু তখন production-এর আচরণটা পরীক্ষাই হতো না —
+      # আর পরে NODE_ENV=production যোগ করলে CI হঠাৎ ভাঙত।
+      # throwaway মান; আসল চাবি কখনো এখানে লেখা হবে না।
+      COURIER_SECRET_KEY: 00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff
 
     steps:
       - uses: actions/checkout@v5
