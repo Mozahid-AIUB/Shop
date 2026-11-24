@@ -20,7 +20,9 @@ import {
   type LoginInput,
   type RegisterInput,
 } from '@shop/shared';
+import { Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
+import { THROTTLE_LOGIN, THROTTLE_REGISTER } from '../../common/throttle.config';
 import { AuthService, type AuthResult } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
@@ -43,7 +45,12 @@ export class AuthController {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * ঘণ্টায় ১০টা অ্যাকাউন্ট — একই IP থেকে ভুয়া অ্যাকাউন্টের বান ঠেকায়।
+   * আসল দোকানে এক বাড়ি/অফিস থেকে এর বেশি অ্যাকাউন্ট খোলার কারণ নেই।
+   */
   @Public()
+  @Throttle({ [THROTTLE_REGISTER]: {} })
   @Post('register')
   async register(
     @Body(new ZodValidationPipe(registerSchema)) body: RegisterInput,
@@ -54,7 +61,12 @@ export class AuthController {
     return this.send(response, result);
   }
 
+  /**
+   * মিনিটে ৫ চেষ্টা। ব্যর্থ চেষ্টাও গোনা হয় — নইলে brute force
+   * বিনামূল্যে চলত। আসল ইউজার পাসওয়ার্ড ভুললে ৫ বারেই বুঝে যায়।
+   */
   @Public()
+  @Throttle({ [THROTTLE_LOGIN]: {} })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
