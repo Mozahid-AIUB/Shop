@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { formatOptions } from './cart.service';
 import { FraudService } from './fraud.service';
 import { OrderNumberService } from './order-number.service';
+import { ShippingService } from '../shipping/shipping.service';
 
 const ORDER_LIST_SELECT = {
   id: true,
@@ -81,6 +82,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly orderNumbers: OrderNumberService,
     private readonly fraud: FraudService,
+    private readonly shippingRules: ShippingService,
   ) {}
 
   /**
@@ -143,10 +145,17 @@ export class OrdersService {
     const subtotalPaisa = lines.reduce((sum, line) => sum + line.lineTotalPaisa, 0);
 
     /**
-     * শিপিং আর ডিসকাউন্ট এখনো ০ — Phase 05/09-এ নিয়ম যোগ হবে।
-     * ফিল্ডগুলো এখনই আছে যাতে পরে schema বদলাতে না হয়।
+     * ডেলিভারি চার্জ — জেলা অনুযায়ী, DB-র নিয়ম থেকে (Phase 14)।
+     *
+     * **ছাড়ের আগের subtotal** দিয়ে গোনা হয়। কুপনের ছাড় বাদ দিয়ে
+     * গুনলে ক্রেতা ছাড় নেওয়ার পর ফ্রি ডেলিভারির সীমার নিচে নেমে
+     * যেত আর হঠাৎ চার্জ ফিরে আসত।
+     *
+     * চার্জটা অর্ডারে **কপি** হয়ে যায়, তাই পরে অ্যাডমিন চার্জ
+     * বদলালেও পুরোনো অর্ডারের ইনভয়েস বদলাবে না।
      */
-    const shippingPaisa = 0;
+    const shippingQuote = await this.shippingRules.quote(shipping.shipDistrict, subtotalPaisa);
+    const shippingPaisa = shippingQuote.chargePaisa;
     const discountPaisa = 0;
 
     const created = await this.prisma.$transaction(

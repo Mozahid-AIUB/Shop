@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { AdminModule } from './modules/admin/admin.module';
+import { ShippingModule } from './modules/shipping/shipping.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { PaymentsModule } from './modules/payments/payments.module';
@@ -30,6 +31,7 @@ import { PrismaModule } from './prisma/prisma.module';
     OrdersModule,
     PaymentsModule,
     AdminModule,
+    ShippingModule,
   ],
   providers: [
     /**

@@ -106,13 +106,22 @@
 
 ## Phase 10 — Courier
 
-- [ ] 10.1 `CourierProvider` interface
-- [ ] 10.2 Steadfast adapter
-- [ ] 10.3 Pathao adapter
-- [ ] 10.4 RedX adapter
-- [ ] 10.5 Order → consignment (এক ক্লিক)
-- [ ] 10.6 Webhook → delivery status sync
-- [ ] 10.7 **টেস্ট:** webhook signature verify, duplicate webhook
+> **সিদ্ধান্ত:** API key যে ব্যবহার করবে সে-ই দেবে (`.env`-এ)। key
+> কুরিয়ার কোম্পানির সাথে করা **ব্যবসার নিজের অ্যাকাউন্টে** বাঁধা —
+> এক key দিয়ে অন্যের পার্সেল পাঠালে বিল আর COD-র টাকা ভুল
+> অ্যাকাউন্টে যেত।
+
+- [ ] 10.1 `CourierProvider` interface — createParcel / track / cancel
+- [ ] 10.2 **`manual.provider.ts` — key ছাড়াই চলে (এটা আগে)**
+      হাতে ট্র্যাকিং নম্বর বসানো। না থাকলে যে কোড কিনল তার
+      Steadfast চুক্তি হওয়ার আগ পর্যন্ত সাইটই অচল থাকত
+- [ ] 10.3 Steadfast adapter — **sandbox key লাগবে**
+- [ ] 10.4 Pathao adapter — **key লাগবে**
+- [ ] 10.5 RedX adapter — **key লাগবে**
+- [ ] 10.6 Order → consignment (এক ক্লিক)
+- [ ] 10.7 Webhook → delivery status sync
+- [ ] 10.8 **টেস্ট:** webhook signature verify, duplicate webhook
+- [ ] 10.9 **টেস্ট:** key না থাকলে `manual`-এ পড়ে, সাইট চলে
 
 ---
 
@@ -144,6 +153,121 @@
 - [ ] 13.4 DB backup cron — **আসল সার্ভার লাগবে**, deploy-এর সাথে
 - [ ] 13.5 VPS deploy — Docker ছাড়াও চলবে এমন ব্যবস্থা — **আসল সার্ভার লাগবে**
 - [ ] 13.6 Playwright end-to-end — পুরো flow — **UI লাগবে**
+
+---
+
+## Phase 14 — Shipping Rules
+
+> এখন `shippingPaisa` হার্ডকোড `0` ছিল — মানে **সব ডেলিভারি ফ্রি**।
+> নিয়ম DB-তে, কারণ যে কোড কিনবে তার চার্জ ও এলাকা আলাদা হবে।
+
+- [x] 14.1 **টেস্ট:** zone বাছাই — জেলা মিললে সেটা, নইলে default
+- [x] 14.2 **টেস্ট:** free-above সীমা, default zone না থাকলে কী হয়
+- [x] 14.3 Schema `ShippingZone` + migration + seed (ঢাকা / বাইরে)
+- [x] 14.4 `shipping.service.ts` — `quote(district, subtotal)`
+- [x] 14.5 checkout-এ যুক্ত — **হার্ডকোড `0` সরানো**
+- [x] 14.6 Admin CRUD (`SUPER_ADMIN`)
+- [x] 14.7 Public `GET /shipping/quote` — কার্টে দেখাতে
+
+---
+
+## Phase 15 — Coupon + Campaign
+
+> মালিকের চাওয়া: "যখন যেমন ইচ্ছা তেমন অফার" — তাই নকশা নমনীয়।
+> **এখানে ভুল হলে সরাসরি টাকা যায়**, তাই টেস্ট সবচেয়ে বেশি।
+
+- [ ] 15.1 **টেস্ট:** তিন ধরনের ছাড় (শতকরা / নির্দিষ্ট টাকা / ফ্রি ডেলিভারি)
+- [ ] 15.2 **টেস্ট:** ছাড় কখনো মোটের চেয়ে বেশি নয়, total ঋণাত্মক নয়
+- [ ] 15.3 **টেস্ট:** মেয়াদ, সর্বোচ্চ ব্যবহার, প্রতি-ইউজার সীমা, ন্যূনতম অর্ডার
+- [ ] 15.4 Schema `Coupon` + `CouponRedemption` + migration
+- [ ] 15.5 `coupon.service.ts` — `validate()` আর `redeem()`
+- [ ] 15.6 checkout-এ যুক্ত, **একই transaction-এ**
+- [ ] 15.7 **টেস্ট:** একসাথে দুই অর্ডারে শেষ কুপন — একটাই পাবে (race)
+- [ ] 15.8 Public `POST /coupons/validate` (rate limited)
+- [ ] 15.9 Admin CRUD + কোন কুপন কতবার চলল
+
+---
+
+## Phase 16 — Product Search
+
+> Postgres-এর নিজের full-text search। Elasticsearch নয় — আরেকটা
+> সার্ভার মানে যে কোড কিনবে তার আরেকটা খরচ।
+
+- [ ] 16.1 **টেস্ট:** নাম / ক্যাটাগরি / বিবরণে খোঁজা, ক্রম ঠিক
+- [ ] 16.2 **টেস্ট:** বাংলা লেখায় খোঁজা
+- [ ] 16.3 `tsvector` generated column + GIN index (migration)
+- [ ] 16.4 `GET /products/search?q=` — pagination সহ
+- [ ] 16.5 **টেস্ট:** খসড়া পণ্য ফলাফলে আসে না
+
+---
+
+## Phase 17 — Review + Rating
+
+- [ ] 17.1 **টেস্ট:** যে কেনেনি সে রিভিউ দিতে পারে না (403)
+- [ ] 17.2 **টেস্ট:** একই অর্ডার-আইটেমে দুবার রিভিউ নয়
+- [ ] 17.3 **টেস্ট:** অননুমোদিত রিভিউ public-এ দেখা যায় না
+- [ ] 17.4 Schema `Review` + migration
+- [ ] 17.5 `review.service.ts` + public/admin endpoint
+- [ ] 17.6 গড় রেটিং — **হিসাব করা হবে, সংরক্ষণ নয়** (বাসি হতো)
+
+---
+
+## Phase 18 — Guest Checkout
+
+> এখন **অ্যাকাউন্ট ছাড়া কেনা যায় না** — বাংলাদেশে বড় বাধা।
+> `Order.userId` nullable করা **ঝুঁকিপূর্ণ**: ownership যাচাইয়ের
+> প্রতিটা জায়গা আবার দেখতে হবে।
+
+- [ ] 18.1 **টেস্ট:** গেস্ট অর্ডার দিতে পারে
+- [ ] 18.2 **টেস্ট:** এক গেস্টের token-এ অন্যের cart দেখা যায় না
+- [ ] 18.3 **টেস্ট:** লগইন ইউজারের অর্ডার গেস্ট দেখতে পায় না
+- [ ] 18.4 Schema: `Order.userId` nullable + guest cart token
+- [ ] 18.5 cart ও checkout-এ গেস্ট পথ
+- [ ] 18.6 অ্যাকাউন্ট খোলার সময় পুরোনো অর্ডার জোড়া (ফোন/ইমেইল মিলিয়ে)
+
+---
+
+## Phase 19 — Wishlist
+
+- [ ] 19.1 **টেস্ট:** নিজের উইশলিস্টই দেখা যায়
+- [ ] 19.2 Schema (`userId` + `variantId`, unique) + migration
+- [ ] 19.3 CRUD endpoint
+- [ ] 19.4 **টেস্ট:** একই পণ্য দুবার যোগ করলে একটাই থাকে
+
+---
+
+## Phase 20 — Return + Refund
+
+> `Payment`-এ `REFUNDED` আগে থেকেই আছে, কিন্তু "পণ্য ফেরত"
+> প্রক্রিয়া নেই — এখন শুধু অর্ডার বাতিল করা যায়।
+
+- [ ] 20.1 **টেস্ট:** সময়সীমার পরে ফেরত চাওয়া যায় না
+- [ ] 20.2 **টেস্ট:** রিফান্ডের পর পেমেন্টের হিসাব মেলে
+- [ ] 20.3 Schema `ReturnRequest` + migration
+- [ ] 20.4 `return.service.ts` + endpoint
+- [ ] 20.5 স্টক ফেরত — **অ্যাডমিন সিদ্ধান্ত নেবে** (ছাপা শার্ট বিক্রিযোগ্য নয়)
+- [ ] 20.6 রিপোর্টে ফেরতের হার
+
+---
+
+## Phase 21 — Banner / CMS
+
+> হোমপেজের ছবি ও অফারের পোস্টার বদলাতে যেন deploy না লাগে।
+
+- [ ] 21.1 Schema `Banner` (ছবি, লিংক, ক্রম, সময়সীমা, সক্রিয়)
+- [ ] 21.2 **টেস্ট:** মেয়াদ শেষ banner public-এ আসে না
+- [ ] 21.3 Admin CRUD + public তালিকা
+- [ ] 21.4 `StaticPage` — শর্তাবলী, গোপনীয়তা নীতি, যোগাযোগ
+- [ ] 21.5 ছবি আপলোড — **MinIO লাগবে**, আপাতত URL
+
+---
+
+## Phase 22 — SEO
+
+- [ ] 22.1 Schema: `metaTitle`, `metaDescription` (Product, Category)
+- [ ] 22.2 `GET /sitemap-data` — web যেখান থেকে sitemap বানাবে
+- [ ] 22.3 **টেস্ট:** খসড়া পণ্য sitemap-এ নেই
+- [ ] 22.4 slug বদলালে পুরোনো slug redirect (`ProductSlugHistory`)
 
 ---
 

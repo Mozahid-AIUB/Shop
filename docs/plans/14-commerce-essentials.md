@@ -59,13 +59,13 @@ model ShippingZone {
 | `freeAbovePaisa` zone-ভিত্তিক | ঢাকায় ১০০০+ ফ্রি, বাইরে ২০০০+ |
 | চার্জ অর্ডারে **কপি** হবে | পরে চার্জ বদলালে পুরোনো ইনভয়েস বদলাবে না |
 
-- [ ] 14.1 **টেস্ট:** zone বাছাই — জেলা মিললে সেটা, নইলে default
-- [ ] 14.2 **টেস্ট:** free-above সীমা, আর কোনো zone না থাকলে কী হয়
-- [ ] 14.3 Schema + migration + seed (ঢাকা/বাইরে)
-- [ ] 14.4 `shipping.service.ts` — `quote(district, subtotal)`
-- [ ] 14.5 checkout-এ যুক্ত (হার্ডকোড `0` সরানো)
-- [ ] 14.6 Admin CRUD (`SUPER_ADMIN`)
-- [ ] 14.7 Public `GET /shipping/quote` — কার্টে দেখাতে
+- [x] 14.1 **টেস্ট:** zone বাছাই — জেলা মিললে সেটা, নইলে default
+- [x] 14.2 **টেস্ট:** free-above সীমা, আর কোনো zone না থাকলে কী হয়
+- [x] 14.3 Schema + migration + seed (ঢাকা/বাইরে)
+- [x] 14.4 `shipping.service.ts` — `quote(district, subtotal)`
+- [x] 14.5 checkout-এ যুক্ত (হার্ডকোড `0` সরানো)
+- [x] 14.6 Admin CRUD (`SUPER_ADMIN`)
+- [x] 14.7 Public `GET /shipping/quote` — কার্টে দেখাতে
 
 ---
 
