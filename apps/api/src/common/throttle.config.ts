@@ -33,6 +33,7 @@ export const THROTTLE_SHORT = 'short';
 export const THROTTLE_LOGIN = 'login';
 export const THROTTLE_REGISTER = 'register';
 export const THROTTLE_TRACK = 'track';
+export const THROTTLE_COUPON = 'coupon';
 
 /**
  * `@SkipThrottle()` নাম ধরে কাজ করে — খালি ডাকলে শুধু `default`
@@ -44,6 +45,7 @@ export const SKIP_ALL_THROTTLERS: Record<string, boolean> = {
   [THROTTLE_LOGIN]: true,
   [THROTTLE_REGISTER]: true,
   [THROTTLE_TRACK]: true,
+  [THROTTLE_COUPON]: true,
 };
 
 /**
@@ -79,6 +81,18 @@ export const throttlerConfig = (): ThrottlerOptions[] => [
      * বের করা অকেজো হয়ে যায়, অথচ আসল কাস্টমারের কষ্ট হয় না।
      */
     name: THROTTLE_TRACK,
+    ttl: 60_000,
+    limit: limit(10),
+  },
+  {
+    /**
+     * কুপন কোড যাচাই। কোড ছোট আর অনুমানযোগ্য ("SAVE50", "EID10"),
+     * তাই সীমা না থাকলে স্ক্রিপ্ট চালিয়ে কাজের কুপন খুঁজে বের করা
+     * যেত — আর প্রতিটা চেষ্টায় DB-তে গোনার query চলত।
+     *
+     * মিনিটে ১০: আসল ক্রেতা দুয়েকটা কোড চেষ্টা করে, হাজারটা নয়।
+     */
+    name: THROTTLE_COUPON,
     ttl: 60_000,
     limit: limit(10),
   },

@@ -1,4 +1,5 @@
 export * from './types/health';
+export * from './constants/coupon';
 export * from './constants/fraud';
 export * from './constants/order';
 export * from './constants/order-number';
@@ -8,6 +9,7 @@ export * from './constants/roles';
 export * from './constants/shipping';
 export * from './schemas/auth';
 export * from './schemas/catalog';
+export * from './schemas/coupon';
 export * from './schemas/order';
 export * from './schemas/payment';
 export * from './schemas/production';

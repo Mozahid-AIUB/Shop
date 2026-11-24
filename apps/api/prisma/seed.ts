@@ -161,6 +161,7 @@ async function seedCatalog(prisma: PrismaClient): Promise<void> {
   console.log(`Catalog ready: ${count} published products`);
 
   await seedShippingZones(prisma);
+  await seedCoupons(prisma);
 }
 
 /**
@@ -206,6 +207,55 @@ async function seedShippingZones(prisma: PrismaClient): Promise<void> {
   });
 
   console.log('Shipping zones ready: Dhaka + outside (default)');
+}
+
+/**
+ * উদাহরণ কুপন।
+ *
+ * তিন ধরনের একটা করে — যাতে অ্যাডমিন প্যানেল খুলেই দেখা যায় কী কী
+ * সম্ভব। অঙ্ক আর মেয়াদ সবই প্যানেল থেকে বদলানো যায়।
+ */
+async function seedCoupons(prisma: PrismaClient): Promise<void> {
+  const existing = await prisma.coupon.count();
+
+  // চালু দোকানের কুপন seed আবার চালিয়ে বদলে ফেলা চলবে না
+  if (existing > 0) {
+    console.log(`Coupons already set up (${existing})`);
+    return;
+  }
+
+  await prisma.coupon.createMany({
+    data: [
+      {
+        code: 'WELCOME10',
+        description: 'নতুন ক্রেতার জন্য ১০% — সর্বোচ্চ ২০০ টাকা',
+        type: 'PERCENT',
+        value: 10,
+        // সীমা ছাড়া বড় অর্ডারে অনিচ্ছাকৃত বড় ছাড় যেত
+        maxDiscountPaisa: 20_000,
+        minOrderPaisa: 50_000,
+        maxUsesPerUser: 1,
+      },
+      {
+        code: 'FLAT100',
+        description: '১০০০ টাকার উপরে ১০০ টাকা ছাড়',
+        type: 'FIXED',
+        value: 10_000,
+        minOrderPaisa: 100_000,
+        maxUsesPerUser: 1,
+      },
+      {
+        code: 'FREESHIP',
+        description: '১৫০০ টাকার উপরে ডেলিভারি ফ্রি',
+        type: 'FREE_SHIPPING',
+        value: 0,
+        minOrderPaisa: 150_000,
+        maxUsesPerUser: 3,
+      },
+    ],
+  });
+
+  console.log('Coupons ready: WELCOME10, FLAT100, FREESHIP');
 }
 
 main().catch((error: unknown) => {

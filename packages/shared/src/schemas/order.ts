@@ -70,6 +70,15 @@ export const checkoutSchema = z.object({
   addressId: z.string().cuid().optional(),
   address: createAddressSchema.optional(),
   note: z.string().trim().max(500, 'নোট অনেক বড়').nullable().optional(),
+
+  /**
+   * কুপন কোড — **শুধু কোড, ছাড়ের অঙ্ক নয়**।
+   *
+   * ছাড় কখনো ক্লায়েন্ট থেকে নেওয়া হয় না। `discountPaisa` ইনপুটে
+   * নিলে যে কেউ ব্রাউজার থেকে নিজের ছাড় নিজে ঠিক করত। সার্ভার
+   * কোড দেখে DB-র নিয়ম অনুযায়ী নিজে হিসাব করে।
+   */
+  couponCode: z.string().trim().min(3).max(32).optional(),
 });
 
 export const checkoutInputSchema = checkoutSchema.refine(

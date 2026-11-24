@@ -1,0 +1,190 @@
+/**
+ * কুপনের হিসাব ও শর্ত যাচাই।
+ *
+ * **কেন নিয়মটা shared-এ:** কার্টের পাতায় "SAVE50 বসালে ৫০ টাকা
+ * ছাড়" দেখাতে হয় চেকআউটের আগেই। দুই জায়গায় দুই নিয়ম লিখলে কার্টে
+ * এক আর অর্ডারে আরেক অঙ্ক দেখাত।
+ *
+ * **ছাড়ের অঙ্ক কখনো ক্লায়েন্ট থেকে নেওয়া হয় না** — ব্রাউজার থেকে
+ * `discountPaisa` পাঠানো গেলে যে কেউ নিজের ছাড় নিজে ঠিক করত। API
+ * শুধু কুপনের **কোড** নেয়, বাকিটা সার্ভারে গোনা হয়।
+ */
+
+/** কুপন কী ধরনের ছাড় দেয়। Prisma-র `DiscountType` enum-এর সাথে মিলে। */
+export const DISCOUNT_TYPES = ['PERCENT', 'FIXED', 'FREE_SHIPPING'] as const;
+
+export type DiscountType = (typeof DISCOUNT_TYPES)[number];
+
+/** যাচাইয়ের জন্য কুপনের দরকারি অংশটুকু। */
+export type CouponLike = {
+  id: string;
+  code: string;
+  type: DiscountType;
+  /** `PERCENT`-এ শতাংশ, `FIXED`-এ paisa, `FREE_SHIPPING`-এ অব্যবহৃত */
+  value: number;
+  /** `PERCENT`-এর সর্বোচ্চ ছাড়। `null` = সীমা নেই */
+  maxDiscountPaisa: number | null;
+  minOrderPaisa: number;
+  startsAt: Date | null;
+  endsAt: Date | null;
+  /** সব মিলিয়ে সর্বোচ্চ কতবার। `null` = সীমা নেই */
+  maxUses: number | null;
+  maxUsesPerUser: number;
+  isActive: boolean;
+};
+
+/**
+ * কুপন খাটল না কেন।
+ *
+ * কোড আলাদা করে রাখা হয় যাতে UI নিজের ভাষায় বার্তা দেখাতে পারে,
+ * আর ভবিষ্যতে নতুন কারণ যোগ করলে কম্পাইলারই ধরিয়ে দেয়।
+ */
+export const COUPON_FAILURE = {
+  NOT_FOUND: 'NOT_FOUND',
+  INACTIVE: 'INACTIVE',
+  NOT_STARTED: 'NOT_STARTED',
+  EXPIRED: 'EXPIRED',
+  BELOW_MINIMUM: 'BELOW_MINIMUM',
+  EXHAUSTED: 'EXHAUSTED',
+  ALREADY_USED: 'ALREADY_USED',
+} as const;
+
+export type CouponFailure = (typeof COUPON_FAILURE)[keyof typeof COUPON_FAILURE];
+
+/** ক্রেতাকে দেখানোর বার্তা — প্রতিটা কারণের জন্য একটা। */
+export const COUPON_FAILURE_MESSAGE: Record<CouponFailure, string> = {
+  NOT_FOUND: 'কুপন কোডটা ঠিক নেই',
+  INACTIVE: 'এই কুপন এখন চালু নেই',
+  NOT_STARTED: 'এই কুপন এখনো শুরু হয়নি',
+  EXPIRED: 'এই কুপনের মেয়াদ শেষ',
+  BELOW_MINIMUM: 'অর্ডারের অঙ্ক কুপনের ন্যূনতমের চেয়ে কম',
+  EXHAUSTED: 'এই কুপন আর অবশিষ্ট নেই',
+  ALREADY_USED: 'এই কুপন আপনি আগেই ব্যবহার করেছেন',
+};
+
+export type CouponDiscount = {
+  /** পণ্যের দামে ছাড়, paisa */
+  discountPaisa: number;
+  /**
+   * ডেলিভারি চার্জে ছাড়, paisa।
+   *
+   * **আলাদা রাখা ইচ্ছাকৃত।** `discountPaisa`-তে মিশিয়ে দিলে
+   * ইনভয়েসে "ডেলিভারি ৬০৳" আর "ছাড় ৬০৳" — দুটোই দেখাত, আর
+   * কুরিয়ারের বিলের সাথে হিসাব মেলানো কঠিন হতো।
+   */
+  shippingDiscountPaisa: number;
+};
+
+export type CouponEvaluation =
+  | { ok: true; coupon: CouponLike }
+  | {
+      ok: false;
+      reason: CouponFailure;
+      /** `BELOW_MINIMUM`-এ আর কত টাকার কিনলে চলত। নইলে `null` */
+      shortfallPaisa: number | null;
+    };
+
+export type CouponContext = {
+  /** **ছাড়ের আগের** পণ্যের মোট */
+  subtotalPaisa: number;
+  now: Date;
+  /** এই কুপন সব মিলিয়ে কতবার ব্যবহার হয়েছে */
+  totalUses: number;
+  /** এই ক্রেতা কতবার ব্যবহার করেছে */
+  userUses: number;
+};
+
+/**
+ * কোড স্বাভাবিক করা।
+ *
+ * ক্রেতা হাতে টাইপ করে বা কপি-পেস্ট করে, তাই ফাঁকা জায়গা আর ছোট
+ * হাতের অক্ষর আসে। DB-তে সবসময় বড় হাতে রাখা হয়, তাই খোঁজাও
+ * বড় হাতে।
+ */
+export const normalizeCouponCode = (code: string): string => code.trim().toUpperCase();
+
+/**
+ * ছাড়ের অঙ্ক।
+ *
+ * `subtotalPaisa` **ছাড়ের আগের** অঙ্ক, আর `shippingPaisa` Phase 14-র
+ * quote থেকে আসা চার্জ।
+ */
+export const computeDiscount = (
+  coupon: CouponLike,
+  amounts: { subtotalPaisa: number; shippingPaisa: number },
+): CouponDiscount => {
+  const { subtotalPaisa, shippingPaisa } = amounts;
+
+  if (coupon.type === 'FREE_SHIPPING') {
+    // চার্জ আগেই ০ হলে বাড়তি কিছু নেই — ঋণাত্মক ছাড় হতে পারে না
+    return { discountPaisa: 0, shippingDiscountPaisa: Math.max(shippingPaisa, 0) };
+  }
+
+  /**
+   * শতাংশে ভাঙা পয়সা আসে — `floor` দিয়ে **নিচের দিকে** নেওয়া হয়।
+   * উপরে নিলে প্রতি অর্ডারে এক পয়সা করে বেশি ছাড় যেত, যা বহু
+   * অর্ডারে জমে হিসাব মেলানো কঠিন করত।
+   */
+  const raw =
+    coupon.type === 'PERCENT'
+      ? Math.floor((subtotalPaisa * coupon.value) / 100)
+      : coupon.value;
+
+  const capped = coupon.maxDiscountPaisa === null ? raw : Math.min(raw, coupon.maxDiscountPaisa);
+
+  /**
+   * **এটাই সবচেয়ে দরকারি সীমা।** ছাড় subtotal-এর চেয়ে বড় হলে
+   * total ঋণাত্মক হতো — মানে দোকান ক্রেতাকে টাকা দিচ্ছে। `max(…, 0)`
+   * ঋণাত্মক `value` ভুলে বসানো হলেও রক্ষা করে।
+   */
+  return {
+    discountPaisa: Math.min(Math.max(capped, 0), subtotalPaisa),
+    shippingDiscountPaisa: 0,
+  };
+};
+
+const failure = (reason: CouponFailure, shortfallPaisa: number | null = null): CouponEvaluation => ({
+  ok: false,
+  reason,
+  shortfallPaisa,
+});
+
+/**
+ * কুপন এই অর্ডারে খাটবে কি না।
+ *
+ * শর্তগুলো ক্রমে দেখা হয় আর **প্রথম ব্যর্থতাতেই** থামা হয়, কারণ
+ * ক্রেতাকে একবারে একটা কাজ বলা উচিত — "আগে কুপন চালু করান, তারপর
+ * আরো ৩০০ টাকার কিনুন" বলার কোনো মানে নেই।
+ *
+ * **ব্যবহারের সংখ্যা এখানে ইনপুট হিসেবে নেওয়া হয়, গোনা হয় না** —
+ * গোনাটা DB-র কাজ আর সেটা অবশ্যই অর্ডারের transaction-এর ভেতরে
+ * হতে হবে, নইলে দুটো চেকআউট একই শেষ কুপন পেয়ে যেত।
+ */
+export const evaluateCoupon = (coupon: CouponLike, context: CouponContext): CouponEvaluation => {
+  if (!coupon.isActive) {
+    return failure(COUPON_FAILURE.INACTIVE);
+  }
+
+  // সীমানার মুহূর্তটা ক্রেতার পক্ষে — "শেষ দিন" সত্যিই শেষ দিন
+  if (coupon.startsAt !== null && context.now.getTime() < coupon.startsAt.getTime()) {
+    return failure(COUPON_FAILURE.NOT_STARTED);
+  }
+
+  if (coupon.endsAt !== null && context.now.getTime() > coupon.endsAt.getTime()) {
+    return failure(COUPON_FAILURE.EXPIRED);
+  }
+
+  if (context.subtotalPaisa < coupon.minOrderPaisa) {
+    return failure(COUPON_FAILURE.BELOW_MINIMUM, coupon.minOrderPaisa - context.subtotalPaisa);
+  }
+
+  if (coupon.maxUses !== null && context.totalUses >= coupon.maxUses) {
+    return failure(COUPON_FAILURE.EXHAUSTED);
+  }
+
+  if (context.userUses >= coupon.maxUsesPerUser) {
+    return failure(COUPON_FAILURE.ALREADY_USED);
+  }
+
+  return { ok: true, coupon };
+};
