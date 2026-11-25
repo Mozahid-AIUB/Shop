@@ -56,6 +56,7 @@ npm run dev                          # api :4000 · web :3000
 
 ## Docs
 
+- [docs/plans/HANDOVER.md](docs/plans/HANDOVER.md) — **এখন কী অবস্থা, API-র পুরো তালিকা, কোথা থেকে শুরু**
 - [docs/plans/PROGRESS.md](docs/plans/PROGRESS.md) — কোন phase কোথায়
 - [docs/plans/00-master.md](docs/plans/00-master.md) — পুরো roadmap
 - [CLAUDE.md](CLAUDE.md) — কনভেনশন

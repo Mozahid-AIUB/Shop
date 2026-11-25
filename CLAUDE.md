@@ -19,7 +19,9 @@
 
 ## প্রতি session-এর প্রথম কাজ
 
-1. `docs/plans/PROGRESS.md` পড়ো — কোন phase কোথায় আছে (১৫ লাইন)
+1. `docs/plans/PROGRESS.md` পড়ো — কোন phase কোথায় আছে (১৫ লাইন)।
+   কাজ ধরার আগে `docs/plans/HANDOVER.md`-ও দেখে নাও — এখনকার অবস্থা,
+   API-র পুরো তালিকা, আর যে ভুলগুলো আগে হয়েছে
 2. পরের phase-এর sub-plan ফাইলটা পড়ো — **শুধু ওইটা**, `docs/plans/00-master.md` বা অন্য sub-plan নয়
 3. কাজ শেষে `PROGRESS.md` আপডেট করো
 
